@@ -3,7 +3,7 @@
 
 int value; //diff
 int prev_val = 0;
-int t;
+int t = 0;
 
 int ascii[8]; //2byte *8 16byte //文字なら010までは固定っぽい //5*8で40 hello用
 int pointer = 0; //1khzだと最初読み取れないので1　ふつうは0
@@ -21,9 +21,9 @@ void setup() {
 }
 
 void loop() { //tの間隔　400 2000 400 2400 400 1600のとき　180-230 180 230
-  value = (analogRead(analogPIN)) ;
+  value = analogRead(analogPIN);
   t++;
-  if (value - prev_val >300) { //500くらいのdiff
+  if (value - prev_val >300) { 
      // これがないと1kHzはむりっぽい
     Serial.println(t);
     delayMicroseconds(50);
