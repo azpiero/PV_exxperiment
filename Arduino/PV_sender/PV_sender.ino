@@ -3,6 +3,8 @@
 
 int ON_reader = 200; // 400 2000 / 400 2400 /400 16000
 int OFF_reader = 1000;
+int ON_end = 200;
+int OFF_end = 2000;
 int ON_1 = 200;
 int OFF_1 = 1300;
 int ON_0 = 200;
@@ -24,7 +26,7 @@ void loop() {
     if(flag ==1){
       delayMicroseconds(5000); //Serial.availableをbuffに格納するのに必要そうな時間
       char len = (Serial.available() + '1') ; //文字数を取得
-      make_markpulse(); //
+      make_markpulse(ON_reader,OFF_reader); //
       make_pulse(len,8); //lengthを送るため
       flag = 0;
     }
@@ -34,12 +36,12 @@ void loop() {
   }
 }
 
-void make_markpulse() {
+void make_markpulse(int ON, int OFF) {
   for(int n = 0; n<3; n++){
     digitalWrite(digitalPIN, HIGH);
-    delayMicroseconds(ON_reader);
+    delayMicroseconds(ON);
     digitalWrite(digitalPIN, LOW);
-    delayMicroseconds(OFF_reader);
+    delayMicroseconds(OFF);
   }
 }
 
@@ -86,7 +88,7 @@ void add_checksum(){
   cal_crc();
   make_pulse(crc[0],8); //いまいち釈然としないけど笑
   make_pulse(crc[1],8);
-  make_markpulse();
+  make_markpulse(ON_end,OFF_end);
   pData = 0;
   flag = 1; 
   Serial.println();
