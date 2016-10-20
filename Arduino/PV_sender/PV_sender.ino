@@ -2,11 +2,11 @@
 #define digitalPIN 9              // LEDはピン13に接続
 
 int ON_reader = 200; // 400 2000 / 400 2400 /400 16000
-int OFF_reader = 800;
+int OFF_reader = 1000;
 int ON_1 = 200;
-int OFF_1 = 1000;
+int OFF_1 = 1300;
 int ON_0 = 200;
-int OFF_0 = 600; //お試し
+int OFF_0 = 700; //お試し
 
 char Data[10]; //とりあえず10文字で
 int pData = 0;
