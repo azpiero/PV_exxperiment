@@ -11,7 +11,7 @@ int flag = 0; //最初の確認
 unsigned short crc16 = 0xFFFFU; //
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   cbi(ADCSRA, ADPS2); //もともと cbi  adps0 prescale (set cbi 0 sbi 1)
   sbi(ADCSRA, ADPS1); //         sbi
   cbi(ADCSRA, ADPS0); //         cbi
@@ -23,6 +23,19 @@ void setup() {
 void loop() { //tの間隔　400 2000 400 2400 400 1600のとき　180-230 180 230
   value = analogRead(analogPIN);
   t++;
+  /*
+  //if(value - prev_val > 300){
+    //Serial.print("t:");
+    //Serial.print(t-1);
+    //Serial.print(" value:");
+    if(value > 500){
+      //Serial.print(t);
+      //Serial.print(",");
+      Serial.println(value);
+      t = 0;
+    }
+  //}
+  */
   if (value - prev_val >300) { 
      // これがないと1kHzはむりっぽい
     Serial.println(t);
