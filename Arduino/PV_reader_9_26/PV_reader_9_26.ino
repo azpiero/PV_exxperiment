@@ -1,14 +1,16 @@
 #include <wiring_private.h>
 #define analogPIN 3
+#define N 13 // 1 + 10 + 3
 
 int value; //diff
 int prev_val = 0;
 int t = 0;
 
-int ascii[8]; //2byte *8 16byte //文字なら010までは固定っぽい //5*8で40 hello用
-int packet[104];
-int pointer = 0; //1khzだと最初読み取れないので1　ふつうは0
-int flag = 0; //最初の確認
+ //int ascii[8]; //2byte *8 16byte //文字なら010までは固定っぽい //5*8で40 hello用
+bool packet[N][8]; //intで保管するとめんどそう
+int p = 0;
+int pointer = 0;
+
 unsigned short crc16 = 0xFFFFU; //
 
 void setup() {
@@ -16,8 +18,10 @@ void setup() {
   cbi(ADCSRA, ADPS2); //もともと cbi  adps0 prescale (set cbi 0 sbi 1)
   sbi(ADCSRA, ADPS1); //         sbi
   cbi(ADCSRA, ADPS0); //         cbi
-  for(int i =0;i<8;i++){
-    ascii[i] = 0;
+  for(int i =0;i<N;i++){
+    for(int j = 0;j<8;j++){
+      packet[i][j] = 0;
+    }
   }
 }
 
@@ -37,7 +41,7 @@ void loop() { //tの間隔　400 2000 400 2400 400 1600のとき　180-230 180 2
     }
   //}
   */
-  if (value - prev_val >300) { 
+  if (value - prev_val >300) {
      // これがないと1kHzはむりっぽい
     //Serial.println(t);
     delayMicroseconds(50);
@@ -46,51 +50,64 @@ void loop() { //tの間隔　400 2000 400 2400 400 1600のとき　180-230 180 2
       Serial.println("初期値");
     }else if(50<= t && t< 80 ){ //へんな1を殺す
        //ascii[pointer] = 0; //1or0なら格納
-       packet[pointer] = 0;
+       packet[p][pointer] = 0;
        delayMicroseconds(100);
        //Serial.print(ascii[pointer]);
        pointer ++;
-       Serial.print("0: ");
-       Serial.println(pointer);
+       //Serial.print("0: ");
+       //Serial.println(pointer);
+       p_inc();
+
     }else if(t<=140 && t>=110){
        //ascii[pointer] = 1; //1or0なら格納
-       packet[pointer] = 1;
+       packet[p][pointer] = 1;
        delayMicroseconds(100);
        //Serial.print(ascii[pointer]); //  1/Serial.begin() * (8*文字 + 1 + 1 ) たとえば9600で1文字は1ms程度
        pointer ++;
-       Serial.print("1: ");
-       Serial.println(pointer);
-    }else{
-       Serial.print("その他"); 
+       //Serial.print("1: ");
+       //Serial.println(pointer);
+       p_inc();
+
+    }else if(t>200){  //試し
+       show(); //文字見せる リセット
+       for(int i =0;i<N;i++){
+         for(int j =0;j<8;j++){
+         packet[i][j] = 0;
+        }
+       }
+       p = 0;
+       pointer = 0;
     }
+
     t = 0;
   }
-  /*
-   if(pointer > 7){
-    int len;
-    Serial.print("flag:");
-    Serial.println(flag);
-     char c = ascii[0] * 128 + ascii[1] * 64 + ascii[2] * 32 + ascii[3] * 16 + ascii[4] * 8 + ascii[5] * 4 + ascii[6] * 2 + ascii[7];
-     if(flag == 0){
-       len = c; //これでlenにdatalength取得
-       Serial.print("len:");
-       Serial.println(len);
-       flag = 1;
-       pointer=0; 
-     }else if(flag == 1 && len >0){
-       len -- ;
-       Serial.println(c);
-       pointer = 0;
-       crc(c) ; //この計算結果を把握しておく
-     }else{
-       pointer = 0;
-       flag ++; //これを回数にとりあえず利用してみる
-       check(c); //error判定 再送？？ 2回入りたい
-       flag = 0; //戻しておく
-       }
-     }
-    */
+
   prev_val = value;
+}
+
+void p_inc(){
+  if(pointer >7){
+    p ++;
+    pointer = 0;
+  }
+}
+
+void show(){
+  //初手長さ
+  char c =  packet[0][0] * 128 + packet[0][1] * 64 + packet[0][2] * 32 + packet[0][3] * 16 + packet[0][4] * 8 + packet[0][5] * 4 + packet[0][6] * 2 + packet[0][7];
+  int len = c ;
+  Serial.print("len:");
+  Serial.println(len);
+  p++;
+  while(len >0){
+    c = packet[p][0] * 128 + packet[p][1] * 64 + packet[p][2] * 32 + packet[p][3] * 16 + packet[p][4] * 8 + packet[p][5] * 4 + packet[p][6] * 2 + packet[p][7];
+    Serial.print("data:");
+    Serial.println(c);
+    crc(c);
+    p++;
+    len--;
+  }
+  check();
 }
 
 //crcを再帰的に計算するイメッジ
@@ -106,15 +123,13 @@ void crc(char c) {
    }
 }
 
-void check(char c){
-  if(flag == 2){
-    if(((crc16 >> 8) ^ (0x0000 ^ c)) != 0x0000){
+void check(){
+  for(int i = 0;i<16;i++){
+    if((crc16 >> (15-i)) ^ packet[p][i%8] == 1){
       Serial.println("error!");
     }
-  }
-  if(flag == 3){
-    if(((crc16  <<8)^ ((0x0000 ^c) <<8)) != 0x0000){
-      Serial.println("error!");
+    if(i == 7){
+      p++;
     }
   }
 }
