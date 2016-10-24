@@ -1,19 +1,18 @@
 #include <wiring_private.h> //analogread高速化
-#define digitalPIN 9              // LEDはピン13に接続
+#define digitalPIN 9        // LEDはdigital9pinに接続
 
 int ON_reader = 200; // 400 2000 / 400 2400 /400 16000
-int OFF_reader = 1000;
+int OFF_reader = 3000;
 int ON_end = 200;
 int OFF_end = 2000;
 int ON_1 = 200;
 int OFF_1 = 1300;
 int ON_0 = 200;
-int OFF_0 = 700; //お試し
+int OFF_0 = 700; 
 
-char Data[10]; //とりあえず10文字で
+char Data[20]; //とりあえず20文字で
 int pData = 0;
 char crc[2]; //これもなんとかしたいな
-int flag = 1; //最初に到達したSerialか否か いらなそう
 
 void setup() {
   Serial.begin(9600);
@@ -23,16 +22,18 @@ void setup() {
 void loop() {
   if (Serial.available() > 0) { //Serial.available()の返り値がデータのバイト数 charなら1byte 64までいける
     Data[pData] = Serial.read();
-    if(flag ==1){
-      delayMicroseconds(5000); //Serial.availableをbuffに格納するのに必要そうな時間
-      char len = (Serial.available() + '1') ; //文字数を取得
+    pData ++;
+    delayMicroseconds(5000); //Serial.availableをbuffに格納するのに必要そうな時間
+    if(Serial.available() == 0) {
+      cal_crc();
+      char len = (pData + '0') ; //文字数を取得
       make_markpulse(ON_reader,OFF_reader); //
       make_pulse(len,8); //lengthを送るため
-      flag = 0;
+      for(int i = 0;i<pData;i++){
+        make_pulse(Data[i],8); //
+      }
+      add_checksum();
     }
-    make_pulse(Data[pData],8); //
-    pData ++; //makepulseしたらインクリ
-    if(Serial.available() == 0) add_checksum();
   }
 }
 
@@ -85,11 +86,9 @@ void make_pulse(char data, int n){ //
 }
 
 void add_checksum(){
-  cal_crc();
   make_pulse(crc[0],8); //いまいち釈然としないけど笑
   make_pulse(crc[1],8);
   make_markpulse(ON_end,OFF_end);
   pData = 0;
-  flag = 1; 
   Serial.println();
 }
