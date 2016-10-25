@@ -38,12 +38,9 @@ void loop() {
        make_pulse(Data[i],8); //
       }
      add_checksum();
-     if(j ==100){
-        flag = 0;
-        delay(100000000); //delayなのに単位がmsecじゃなさそう
-     }
+     delay(500); //delayなのに単位がmsecじゃなさそう
    }
-   delay(10000000); //delayなのに単位がmsecじゃなさそう
+   delay(3000); //delayなのに単位がmsecじゃなさそう
   }
 }
 
