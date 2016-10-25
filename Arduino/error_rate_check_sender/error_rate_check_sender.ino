@@ -10,7 +10,7 @@ int OFF_1 = 1300;
 int ON_0 = 200;
 int OFF_0 = 700; //お試し
 
-char Data[10]; //とりあえず10文字で
+char Data[20]; //とりあえず10文字で
 int pData = 0;
 char crc[2]; //これもなんとかしたいな
 int flag = 0; //最初に到達したSerialか否か いらなそう
@@ -23,9 +23,10 @@ void setup() {
 void loop() {
   if (Serial.available() > 0) { //Serial.available()の返り値がデータのバイト数 charなら1byte 64までいける
     Data[pData] = Serial.read();
-    delayMicroseconds(10000);
+    delayMicroseconds(1000);
     pData ++;
     if(Serial.available() == 0){
+      cal_crc(); //ここでCRC計算しておく
       flag = 1;
     }
   }
@@ -93,9 +94,9 @@ void make_pulse(char data, int n){ //
 }
 
 void add_checksum(){
-  cal_crc();
   make_pulse(crc[0],8); //いまいち釈然としないけど笑
   make_pulse(crc[1],8);
   make_markpulse(ON_end,OFF_end);
   Serial.println();
+  //flag = 0;
 }
