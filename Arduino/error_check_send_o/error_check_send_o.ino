@@ -18,7 +18,7 @@
 #define SW_BIT4 8
 #define SW_BIT5 9
 #define SW_TRANSMIT 11
-#define N 5
+#define N 1400
 
 // デバイスの状態
 byte device_id=0;
@@ -46,7 +46,7 @@ byte send_packet[N];
 #define PULSE_DRIVE_DURATION    200
 #define PULSE_ZERO_DURATION     800
 #define PULSE_ONE_DURATION     1600
-#define PULSE_BREAK_DURATION   5000
+#define PULSE_BREAK_DURATION   2400
 
 void sendZero(){
   digitalWrite(L_DRIVE,HIGH);
@@ -85,13 +85,14 @@ void sendPacket(){
     for(j=1;j<256;j<<=1){
       if(*p&j){
         sendOne();
-        Serial.print(1);
+        //Serial.print(1);
       }else{
         sendZero();
-        Serial.print(0);
+        //Serial.print(0);
       }
     }
   }
+  Serial.println("Send!!");
   sendPostamble();
 }
 
@@ -114,7 +115,7 @@ void setup(){
 // mainルーチン
 void loop(){
   for(int i = 0;i<N-1;i++){
-    send_packet[i]=-1;
+    send_packet[i]=random(-128,127);
   }
   unsigned short send_packet_crc=crc(send_packet,N-1);
   send_packet[N-1]=byte(send_packet_crc);
@@ -123,10 +124,11 @@ void loop(){
   sendPacket();
   delay(1000);
   digitalWrite(LED_TX,LOW);
-  
-  for(int i=0;i<10;i++){
+  /*
+  for(int i=0;i<5;i++){
     delay(1000);
   }
+  */
 }
 
 // CRC16の計算アルゴリズム
