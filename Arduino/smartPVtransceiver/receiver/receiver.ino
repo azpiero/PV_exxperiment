@@ -47,14 +47,16 @@ void recvPacket(){
         // Do Nothing (destroy garbage)
       }else if(duration_counter<13){
         //this_bit=0;
-        if(++bit_index>=4){
+        if(++bit_index>=5){
           byte byte_index=(bit_index-5)>>3;
+          Serial.println(byte_index);
           recv_packet[byte_index]>>=1;
         }
       }else if(duration_counter<26){
         //this_bit=1;
-        if(++bit_index>=4){
+        if(++bit_index>=5){
           byte byte_index=(bit_index-5)>>3;
+          Serial.println(byte_index);
           recv_packet[byte_index]>>=1;
           recv_packet[byte_index]|=0x80;
         }

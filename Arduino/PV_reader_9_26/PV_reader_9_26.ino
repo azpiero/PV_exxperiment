@@ -32,59 +32,57 @@ void loop() { //tの間隔　400 2000 400 2400 400 1600のとき　180-230 180 2
 
   value = analogRead(analogPIN);
   t++;
-if (value - prev_val >300) {
-  /*
+if (value - prev_val >150) {
   Serial.print("t: ");
   Serial.print(t);
   Serial.println(" ");
-  */
-  
-  delayMicroseconds(100);
-  if(st <= 2) {
-    delayMicroseconds(50);
-    if (t>=250) { //初期化する感じ この値は周期やcbiの設定によっsて変化してしまう
-      //Serial.println("初期値");
-      crc16 = 0xFFFFU;
-      st ++;
-    }
-    }else if(st > 2){
-      if(t< 90 ){ //へんな1を殺す
-        //ascii[pointer] = 0; //1or0なら格納
-        packet[p][pointer] = 0;
-        delayMicroseconds(100);
-        //Serial.print(ascii[pointer]);
-        pointer ++;
-        /*
-        Serial.print(pointer);
-        Serial.println(": 0");
-        */
-        p_inc();
-
-        }else if(t<=150 && t>=90){
-          //ascii[pointer] = 1; //1or0なら格納
-          packet[p][pointer] = 1;
-          delayMicroseconds(100);
-          //Serial.print(ascii[pointer]); //  1/Serial.begin() * (8*文字 + 1 + 1 ) たとえば9600で1文字は1ms程度
-          pointer ++;
-          /*
-          Serial.print(pointer);
-          Serial.println(": 1");
-          */
-          p_inc();
-        }
-        else if(t>150 && t < 250){  //試し
-          show(); //文字見せる リセット
-          for(int i =0;i<N;i++){
-            for(int j =0;j<8;j++){
-              packet[i][j] = 0;
-            }
-          }
-          p = 0;
-          pointer = 0;
-          st = 0;
-        }
-      }
-      t = 0;
+//  
+//  delayMicroseconds(100);
+//  if(st <= 2) {
+//    delayMicroseconds(50);
+//    if (t>=250) { //初期化する感じ この値は周期やcbiの設定によっsて変化してしまう
+//      //Serial.println("初期値");
+//      crc16 = 0xFFFFU;
+//      st ++;
+//    }
+//    }else if(st > 2){
+//      if(t< 90 ){ //へんな1を殺す
+//        //ascii[pointer] = 0; //1or0なら格納
+//        packet[p][pointer] = 0;
+//        delayMicroseconds(100);
+//        //Serial.print(ascii[pointer]);
+//        pointer ++;
+//        /*
+//        Serial.print(pointer);
+//        Serial.println(": 0");
+//        */
+//        p_inc();
+//
+//        }else if(t<=150 && t>=90){
+//          //ascii[pointer] = 1; //1or0なら格納
+//          packet[p][pointer] = 1;
+//          delayMicroseconds(100);
+//          //Serial.print(ascii[pointer]); //  1/Serial.begin() * (8*文字 + 1 + 1 ) たとえば9600で1文字は1ms程度
+//          pointer ++;
+//          /*
+//          Serial.print(pointer);
+//          Serial.println(": 1");
+//          */
+//          p_inc();
+//        }
+//        else if(t>150 && t < 250){  //試し
+//          show(); //文字見せる リセット
+//          for(int i =0;i<N;i++){
+//            for(int j =0;j<8;j++){
+//              packet[i][j] = 0;
+//            }
+//          }
+//          p = 0;
+//          pointer = 0;
+//          st = 0;
+//        }
+//      }
+    t = 0;
     }
     prev_val = value;
   }
