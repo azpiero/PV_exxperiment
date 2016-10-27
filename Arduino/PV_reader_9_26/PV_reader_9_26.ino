@@ -1,6 +1,6 @@
 #include <wiring_private.h>
 #define analogPIN 3
-#define N 24 // 1 + 10 + 3
+#define N 203 // 1 + 10 + 2
 
 int value; //diff
 int prev_val = 0;
@@ -48,23 +48,23 @@ if (value - prev_val >300) {
       st ++;
     }
     }else if(st > 2){
-      if(t< 90 ){ //へんな1を殺す
+      if(t< 90 ){ 
         //ascii[pointer] = 0; //1or0なら格納
         packet[p][pointer] = 0;
         delayMicroseconds(100);
-        //Serial.print(ascii[pointer]);
+        Serial.print(packet[p][pointer]);
         pointer ++;
         /*
         Serial.print(pointer);
         Serial.println(": 0");
         */
         p_inc();
-
+        
         }else if(t<=150 && t>=90){
           //ascii[pointer] = 1; //1or0なら格納
           packet[p][pointer] = 1;
           delayMicroseconds(100);
-          //Serial.print(ascii[pointer]); //  1/Serial.begin() * (8*文字 + 1 + 1 ) たとえば9600で1文字は1ms程度
+          Serial.print(packet[p][pointer]); //  1/Serial.begin() * (8*文字 + 1 + 1 ) たとえば9600で1文字は1ms程度
           pointer ++;
           /*
           Serial.print(pointer);
@@ -99,18 +99,17 @@ void p_inc(){
 void show(){
   //初手長さ
   p = 0;
-  char c =  packet[p][0] * 128 + packet[p][1] * 64 + packet[p][2] * 32 + packet[p][3] * 16 + packet[p][4] * 8 + packet[p][5] * 4 + packet[p][6] * 2 + packet[p][7];
+  unsigned char c =  packet[p][0] * 128 + packet[p][1] * 64 + packet[p][2] * 32 + packet[p][3] * 16 + packet[p][4] * 8 + packet[p][5] * 4 + packet[p][6] * 2 + packet[p][7];
   int len = c - '0';
-  /*
   Serial.print("len:");
   Serial.println(len);
-  */
   p++;
   while(len >0){
-    c = packet[p][0] * 128 + packet[p][1] * 64 + packet[p][2] * 32 + packet[p][3] * 16 + packet[p][4] * 8 + packet[p][5] * 4 + packet[p][6] * 2 + packet[p][7];
+    char data;
+    data = packet[p][0] * 128 + packet[p][1] * 64 + packet[p][2] * 32 + packet[p][3] * 16 + packet[p][4] * 8 + packet[p][5] * 4 + packet[p][6] * 2 + packet[p][7];
     //Serial.print("data:");
-    Serial.print(c);
-    crc(c);
+    Serial.print(data);
+    crc(data);
     p++;
     len--;
    
