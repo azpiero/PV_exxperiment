@@ -18,19 +18,20 @@
 #define SW_BIT4 8
 #define SW_BIT5 9
 #define SW_TRANSMIT 11
-#define N 20
-
+#define N 1400
 
 #define PULSE_DRIVE_DURATION    200
 #define PULSE_ZERO_DURATION     800
 #define PULSE_ONE_DURATION     1600
-#define PULSE_BREAK_DURATION   5000
+#define PULSE_BREAK_DURATION   2400
 
 int duration_counter=0;
 int bit_index=0;
 byte preamble=0;
 byte recv_packet[N];
 byte n_recv_packet=0;
+int true_count = 0;
+int error_count = 0;
 
 void recvPacket(){
   
@@ -50,15 +51,17 @@ void recvPacket(){
       }else if(duration_counter<13){
         //this_bit=0;
         if(++bit_index>=5){
-          byte byte_index=(bit_index-5)>>3;
+          int byte_index=(bit_index-5)>>3;
           recv_packet[byte_index]>>=1;
+          //Serial.print(0);
         }
       }else if(duration_counter<26){
         //this_bit=1;
         if(++bit_index>=5){
-          byte byte_index=(bit_index-5)>>3;
+          int byte_index=(bit_index-5)>>3;
           recv_packet[byte_index]>>=1;
           recv_packet[byte_index]|=0x80;
+            //Serial.print(1);
         }
       }else{
       //  this_bit=2;   // start -- detected
@@ -69,14 +72,14 @@ void recvPacket(){
     }
     psig=sig;
 
-   if(++duration_counter>5000 || bit_index>=255){
+   if(++duration_counter>2400 || bit_index>= 11500){
         
       // break detected 
-      if(bit_index>0){
+    if(bit_index>0){
         digitalWrite(LED_RX,HIGH);
         
-//        if(!((bit_index-4)&0x07)){
-//          n_recv_packet=(bit_index-5)>>3;
+        if(!((bit_index-4)&0x07)){
+         n_recv_packet=(bit_index-5)>>3;
 //          
 //          if(n_recv_packet==4){
 //            unsigned short recv_packet_crc=crc(recv_packet,3);
@@ -86,13 +89,16 @@ void recvPacket(){
 //              Serial.print("; T="); Serial.println(recv_packet[2]);
 //            }
 //          }
-//        }
+       }
         unsigned short recv_packet_crc=crc(recv_packet,N-1);
+
         if(recv_packet[N-1]==byte(recv_packet_crc)){ 
-          for(int i = 0;i<N;i++){
-          Serial.println(recv_packet[i]);
-          }
-        }       
+          Serial.print("ok! ");
+          Serial.println( ++true_count );
+        }else{
+          Serial.print("NG! ");
+          Serial.println( ++error_count );
+        }
         digitalWrite(LED_RX,LOW);
 
         bit_index=0;
