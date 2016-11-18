@@ -19,13 +19,22 @@
 #define PULSE_BREAK_DURATION   5000
 
 int duration_counter = 0;
+int psig;
 
-void recvPacket(){
-  int sig;
-  int psig=analogRead(CT_SIGNAL);
+void getDistribution(sig_dis){
+  Serial.print("Difference of Signals : ");
+  Serial.print(sig_dis);
+}
+
+void recvSignal(){
+  int sig = analogRead(CT_SIGNAL);
 
   Serial.print("Signal : ");
-  Serial.print(psig);
+  Serial.println(sig);
+
+  getDistribution(psig - sig);
+
+  psig = sig;
 }
 
 void setup() {
@@ -43,8 +52,10 @@ void setup() {
   pinMode(SW_BIT4,INPUT_PULLUP);
   pinMode(SW_BIT5,INPUT_PULLUP);
   pinMode(SW_TRANSMIT,INPUT_PULLUP);
+
+  psig = analogRead(CT_SIGNAL);
 }
 
 void loop() {
-  recvPacket();
+  recvSignal();
 }
