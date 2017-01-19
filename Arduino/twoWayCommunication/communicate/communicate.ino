@@ -75,7 +75,7 @@ void createCommand(){
 //とりあえずcommand =1(状態を知りたい)
 void createResppacket(){
   int command = 10; //適当
-  send_packet[0] = recv_packet[3]; //仮 実際には送信されてきたid
+  send_packet[0] = recv_packet[2]; //仮 実際には送信されてきたid
   send_packet[1] = command;
   send_packet[2] = voltage;
   send_packet[3] = temperature;
@@ -83,7 +83,8 @@ void createResppacket(){
   send_packet[4]= byte(send_packet_crc);
 }
 
-void getDeviceStatus(){        device_id=0;
+void getDeviceStatus(){        
+  device_id=0;
   if(digitalRead(SW_BIT0)==LOW){ device_id+=1; }
   if(digitalRead(SW_BIT1)==LOW){ device_id+=2; }
   if(digitalRead(SW_BIT2)==LOW){ device_id+=4; }
@@ -155,33 +156,28 @@ void recvPacket(){
   n_recv_packet=0;
 
   while(1){
-    //command送信側となる
-    if (Serial.available() > 0){
-      getDeviceStatus();
-      createCommand();
-      // commandは4byteなのでsnedPacketの引数4
-      sendPacket(4);
-    }
     //受信部分
     sig=analogRead(CT_SIGNAL);
-    if(sig-psig>150){
+    
+    if(sig-psig>100){
       // 9 ==> 0;  16 ==> 1  (13 should be the threshold)
+      //Serial.println(duration_counter);
       if(duration_counter<5){
         // Do Nothing (destroy garbage)
       }else if(duration_counter<13){
         //this_bit=0;
         if(++bit_index>=5){
           byte byte_index=(bit_index-5)>>3;
-          //Serial.println(byte_index);
           recv_packet[byte_index]>>=1;
+          Serial.print(0);
         }
       }else if(duration_counter<26){
       //this_bit=1;
         if(++bit_index>=5){
           byte byte_index=(bit_index-5)>>3;
-          //Serial.println(byte_index);
           recv_packet[byte_index]>>=1;
           recv_packet[byte_index]|=0x80;
+          Serial.print(1);
         }
       }else{
       //  this_bit=2;   // start -- detected
@@ -193,15 +189,19 @@ void recvPacket(){
     psig=sig;
 
     //解読部分
-    if(++duration_counter>5000 || bit_index>=255){
-    // break detected
-      if(bit_index>0){
-        digitalWrite(LED_RX,HIGH);
-        //if(!((bit_index-4)&0x07)){
-        if (recv_packet[0] == device_id) {
-          n_recv_packet=(bit_index-5)>>3;
-          unsigned short recv_packet_crc=crc(recv_packet,n_recv_packet -1 );
-          if(recv_packet[4]==byte(recv_packet_crc)){
+    if(++duration_counter>5000 && bit_index>0){ //ここまでok
+      Serial.println("");
+      digitalWrite(LED_RX,HIGH);
+      if (recv_packet[0] == byte(device_id)) {  
+        Serial.println(recv_packet[0]);
+        Serial.println(recv_packet[1]);
+        Serial.println(recv_packet[2]);
+        Serial.println(recv_packet[3]);
+        n_recv_packet=(bit_index-5)>>3;
+        Serial.println(n_recv_packet);
+        unsigned short recv_packet_crc=crc(recv_packet,n_recv_packet);
+        if(recv_packet[n_recv_packet]==byte(recv_packet_crc)){
+            
             if (recv_packet[1] == 1){ //決め打ちcommand受信
               //送信モードに入る必要あり
               getDeviceStatus();
@@ -217,9 +217,16 @@ void recvPacket(){
           }
       digitalWrite(LED_RX,LOW);
       bit_index=0;
-      break;
+      duration_counter=5000;
     }
-     duration_counter=5000;
+    
+    //command送信側となる
+    if (Serial.available() > 0){
+      Serial.read();
+      getDeviceStatus();
+      createCommand();
+      // commandは4byteなのでsnedPacketの引数4
+      sendPacket(4);
     }
   }
 }
@@ -242,6 +249,7 @@ void setup(){
 
 // mainルーチン
 void loop(){
+  getDeviceStatus();
   recvPacket();
 }
 
