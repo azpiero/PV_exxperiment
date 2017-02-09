@@ -23,13 +23,14 @@
 #define SW_TRANSMIT 11
 
 //command list こういう書き方でいいのか
-#define DataReq 		10
-#define syn 				11
-#define communicate 12
-#define Ltica 			13
-#define DataResp 		20
-#define ack 				21
-#define Error 			30
+#define DataReq 		1
+#define syn 				2
+#define communicate 3
+#define Ltica 			4
+#define DataResp 		5
+#define ack 				6
+#define Error 			7
+#define resend			8
 
 
 #define PULSE_DRIVE_DURATION    200
@@ -64,7 +65,14 @@ private:
 	//可変長にしたいけどひとまず保留
 	byte packet[20];
 	int lpacket = 2;
-	int bit_index;
+	int bit_index = 0;
+	//コメント表示用
+	bool flag = 0;
+	int sig=0;
+	int psig=0;
+	byte this_bit=0;
+	byte n_recv_packet=0;
+	int duration_counter=0;
 };
 
 #endif
