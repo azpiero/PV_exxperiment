@@ -16,6 +16,8 @@ void setup(){
   pinMode(SW_BIT5,INPUT_PULLUP);
   pinMode(SW_TRANSMIT,INPUT_PULLUP);
   pv.getstatus();
+  Serial.println("please enter dist ID and command");
+  Serial.println("command 1-datareq 3-communicate");
 }
 
 void loop(){
