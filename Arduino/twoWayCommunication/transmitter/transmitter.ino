@@ -1,7 +1,7 @@
 /**************************************************/
 /*  Smart PV Transceiver . Transmitter Prototype  */
 /*  create: 2016-10-07                            */
-/*  update: 2016-10-07                            */
+/*  update: 2016-11-28                            */
 /**************************************************/
 
 // ピンレイアウトの定義
@@ -20,9 +20,12 @@
 #define SW_TRANSMIT 11
 
 // デバイスの状態
+byte dest_id; //added
 byte device_id=0;
 byte voltage=0;
 byte temperature=0;
+
+byte command = 0; //added
 
 // デバイスの状態の取得
 void getDeviceStatus(){        device_id=0;
@@ -40,15 +43,29 @@ void getDeviceStatus(){        device_id=0;
   temperature=(byte)(temp*500/1024);
 }
 
-byte send_packet[4];
-void createSendPacket(){
-  send_packet[0]=device_id;
-  send_packet[1]=voltage;
-  send_packet[2]=temperature;
+//この辺をcppやhで簡潔に書きたい
+byte send_packet[6];
+void createSendVTPacket(){
+  send_packet[0]=dest_id; 
+  send_packet[1]=command;
+  send_packet[2]=device_id;
+  send_packet[3]=voltage;
+  send_packet[4]=temperature;
+  unsigned short send_packet_crc=crc(send_packet,5);
+  send_packet[5]=byte(send_packet_crc);
+//  send_packet[6]=byte(send_packet_crc>>8);
+}
+
+void createSendLEDPacket(){
+  send_packet[0]=dest_id; 
+  send_packet[1]=command;
+  // 0-OFF 1-ON
+  send_packet[2]= 1; //仮定で1
   unsigned short send_packet_crc=crc(send_packet,3);
   send_packet[3]=byte(send_packet_crc);
 //  send_packet[4]=byte(send_packet_crc>>8);
 }
+
 
 #define PULSE_DRIVE_DURATION    200
 #define PULSE_ZERO_DURATION     800
@@ -83,12 +100,12 @@ void sendPostamble(){
   sendBreak();
 }
 
-void sendPacket(){
+void sendVTPacket(){
   int i,j;
-  byte* p=send_packet;
+  byte* p=send_packet; //決め打ち...
   sendPreamble();
-  for(i=0;i<5;i++,p++){
-    for(j=1;j<256;j<<=1){
+  for(i=0;i<6;i++,p++){ //packet数
+    for(j=1;j<256;j<<=1){ //256 1111 1111を1bitごとずらす 結局8回
       if(*p&j){
         sendOne();
       }else{
@@ -117,17 +134,16 @@ void setup(){
 
 // mainルーチン
 void loop(){
-  int i;
+  command = 0x01; //これでVTと判断すると仮定
+  dest_id = 1; //これも仮定 送信するごとにincrementも手
   getDeviceStatus();
-  createSendPacket();
+  createSendVTPacket();
   digitalWrite(LED_TX,HIGH);
-  sendPacket();
+  sendVTPacket();
   delay(1000);
   digitalWrite(LED_TX,LOW);
 
-  for(i=0;i<29;i++){
-    delay(1000);
-  }
+  delay(5000);
 }
 
 // CRC16の計算アルゴリズム

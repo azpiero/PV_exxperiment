@@ -18,7 +18,7 @@
 #define SW_BIT4 8
 #define SW_BIT5 9
 #define SW_TRANSMIT 11
-#define N 1400
+#define N 2
 
 // デバイスの状態
 byte device_id=0;
@@ -85,10 +85,10 @@ void sendPacket(){
     for(j=1;j<256;j<<=1){
       if(*p&j){
         sendOne();
-        //Serial.print(1);
+        Serial.print(1);
       }else{
         sendZero();
-        //Serial.print(0);
+        Serial.print(0);
       }
     }
   }
@@ -115,7 +115,8 @@ void setup(){
 // mainルーチン
 void loop(){
   for(int i = 0;i<N-1;i++){
-    send_packet[i]=random(-128,127);
+    //send_packet[i]=random(-128,127);
+    send_packet[i] = 0;
   }
   unsigned short send_packet_crc=crc(send_packet,N-1);
   send_packet[N-1]=byte(send_packet_crc);

@@ -15,10 +15,13 @@ void setup(){
   pinMode(SW_BIT4,INPUT_PULLUP);
   pinMode(SW_BIT5,INPUT_PULLUP);
   pinMode(SW_TRANSMIT,INPUT_PULLUP);
+  pv.getstatus();
 }
 
 void loop(){
   //pv.ltica();
+  //pv.getstatus();
+  //pv.showstatus();
   pv.resvPacket();
 
   /*pv.getstatus();

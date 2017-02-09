@@ -18,7 +18,7 @@
 #define SW_BIT4 8
 #define SW_BIT5 9
 #define SW_TRANSMIT 11
-#define N 1400
+#define N 2
 
 #define PULSE_DRIVE_DURATION    200
 #define PULSE_ZERO_DURATION     800
@@ -42,7 +42,8 @@ void recvPacket(){
   n_recv_packet=0;
   while(1){
     sig=analogRead(CT_SIGNAL);
-    if(sig-psig>150){
+    Serial.println(sig);
+    if(sig-psig>100){
       //check duration_counter
       //Serial.print("duration_counter:");
       //Serial.println(duration_counter);
@@ -53,7 +54,7 @@ void recvPacket(){
         if(++bit_index>=5){
           int byte_index=(bit_index-5)>>3;
           recv_packet[byte_index]>>=1;
-          //Serial.print(0);
+          Serial.print(0);
         }
       }else if(duration_counter<26){
         //this_bit=1;
@@ -61,7 +62,7 @@ void recvPacket(){
           int byte_index=(bit_index-5)>>3;
           recv_packet[byte_index]>>=1;
           recv_packet[byte_index]|=0x80;
-            //Serial.print(1);
+            Serial.print(1);
         }
       }else{
       //  this_bit=2;   // start -- detected
@@ -73,13 +74,17 @@ void recvPacket(){
     psig=sig;
 
    if(++duration_counter>2400 || bit_index>= 11500){
-        
       // break detected 
     if(bit_index>0){
         digitalWrite(LED_RX,HIGH);
+        Serial.println("");
+        Serial.print("ID="); Serial.print(recv_packet[0]);
+        Serial.print("; V="); Serial.print(recv_packet[1]);
+        Serial.print("; T="); Serial.println(recv_packet[2]);
         
         if(!((bit_index-4)&0x07)){
          n_recv_packet=(bit_index-5)>>3;
+         
 //          
 //          if(n_recv_packet==4){
 //            unsigned short recv_packet_crc=crc(recv_packet,3);
@@ -92,13 +97,13 @@ void recvPacket(){
        }
         unsigned short recv_packet_crc=crc(recv_packet,N-1);
 
-        if(recv_packet[N-1]==byte(recv_packet_crc)){ 
-          Serial.print("ok! ");
-          Serial.println( ++true_count );
-        }else{
-          Serial.print("NG! ");
-          Serial.println( ++error_count );
-        }
+//        if(recv_packet[N-1]==byte(recv_packet_crc)){ 
+//          Serial.print("ok! ");
+//          Serial.println( ++true_count );
+//        }else{
+//          Serial.print("NG! ");
+//          Serial.println( ++error_count );
+//        }
         digitalWrite(LED_RX,LOW);
 
         bit_index=0;
@@ -130,6 +135,7 @@ void setup(){
 // mainルーチン
 void loop(){
   recvPacket();
+  Serial.println(" ");
 }
 
 // CRC16の計算アルゴリズム

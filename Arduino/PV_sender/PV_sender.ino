@@ -1,5 +1,5 @@
 #include <wiring_private.h> //analogread高速化
-#define digitalPIN 9        // LEDはdigital9pinに接続
+#define digitalPIN 2      // LEDはdigital9pinに接続
 
 int ON_reader = 200; // 400 2000 / 400 2400 /400 16000
 int OFF_reader = 3000;

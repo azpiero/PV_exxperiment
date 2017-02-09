@@ -19,7 +19,6 @@
 #define SW_BIT5 9
 #define SW_TRANSMIT 11
 
-
 #define PULSE_DRIVE_DURATION    200
 #define PULSE_ZERO_DURATION     800
 #define PULSE_ONE_DURATION     1600
@@ -27,12 +26,89 @@
 
 int duration_counter=0;
 int bit_index=0;
+
 byte preamble=0;
-byte recv_packet[5];
+byte recv_packet[3];
+byte send_packet[5];
 byte n_recv_packet=0;
 
-void recvPacket(){
+byte device_id=0;
+byte voltage=0;
+byte temperature=0;
 
+void createSendPacket(){
+  send_packet[0]=
+  send_packet[1]=voltage;
+  send_packet[2]=temperature;
+  unsigned short send_packet_crc=crc(send_packet,3);
+  send_packet[3]=byte(send_packet_crc);
+//  send_packet[4]=byte(send_packet_crc>>8);
+}
+
+void getDeviceStatus(){        device_id=0;
+  if(digitalRead(SW_BIT0)==LOW){ device_id+=1; }
+  if(digitalRead(SW_BIT1)==LOW){ device_id+=2; }
+  if(digitalRead(SW_BIT2)==LOW){ device_id+=4; }
+  if(digitalRead(SW_BIT3)==LOW){ device_id+=8; }
+  if(digitalRead(SW_BIT4)==LOW){ device_id+=16; }
+  if(digitalRead(SW_BIT5)==LOW){ device_id+=32; }
+
+  int volt=analogRead(VOLTAGE);
+  voltage=(byte)((((long)volt*560UL/1024/12)*2+1)/2);  //  = AD*5/1024*(100+12)/12
+
+  int temp=analogRead(TEMPERATURE);
+  temperature=(byte)(temp*500/1024);
+}
+
+void sendZero(){
+  digitalWrite(L_DRIVE,HIGH);
+  delayMicroseconds(PULSE_DRIVE_DURATION);
+  digitalWrite(L_DRIVE,LOW);
+  delayMicroseconds(PULSE_ZERO_DURATION);
+}
+
+void sendOne(){
+  digitalWrite(L_DRIVE,HIGH);
+  delayMicroseconds(PULSE_DRIVE_DURATION);
+  digitalWrite(L_DRIVE,LOW);
+  delayMicroseconds(PULSE_ONE_DURATION);
+}
+
+void sendBreak(){
+  digitalWrite(L_DRIVE,HIGH);
+  delayMicroseconds(PULSE_DRIVE_DURATION);
+  digitalWrite(L_DRIVE,LOW);
+  delayMicroseconds(PULSE_BREAK_DURATION);
+}
+
+void sendPreamble(){
+  sendOne();   sendOne();   sendOne();   sendOne();
+}
+
+void sendPostamble(){
+  sendBreak();
+}
+
+void sendPacket(){
+  int i,j;
+  byte* p=send_packet;
+  sendPreamble();
+  for(i=0;i<N;i++,p++){
+    for(j=1;j<256;j<<=1){
+      if(*p&j){
+        sendOne();
+        Serial.print(1);
+      }else{
+        sendZero();
+        Serial.print(0);
+      }
+    }
+  }
+  Serial.println("Send!!");
+  sendPostamble();
+}
+
+void recvPacket(){
   int sig;
   int psig=analogRead(CT_SIGNAL);
   byte this_bit;
@@ -97,12 +173,22 @@ void recvPacket(){
   }
 }
 
+void createSendPacket(){
+  //ここで目的ノードと命令を指定させる[0][1]
+  for(int i =0;i<2;i++){
+    (Serial.available() > 0) {
+    send_packet[i] = Serial.read(); //device id
+    i ++;
+    }
+  }
+  send_packet[2]=byte(send_packet_crc);
+}
+
+
 // 初期化プログラム
 void setup(){
   Serial.begin(115200);
-
-  Serial.println("Starting...");
-
+  //Serial.println("Starting...");
   pinMode(L_DRIVE,OUTPUT);
   pinMode(LED_TX,OUTPUT);
   pinMode(LED_RX,OUTPUT);
@@ -113,10 +199,17 @@ void setup(){
   pinMode(SW_BIT4,INPUT_PULLUP);
   pinMode(SW_BIT5,INPUT_PULLUP);
   pinMode(SW_TRANSMIT,INPUT_PULLUP);
+
+  for(int i = 0;i<N-1;i++){
+    //send_packet[i]=random(-128,127);
+    send_packet[i] = 0;
+  }
 }
 
 // mainルーチン
 void loop(){
+  createSendPacket(); //命令自体はこれでいいかも．．．
+  sendPacket();
   recvPacket();
 }
 
