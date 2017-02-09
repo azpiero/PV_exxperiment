@@ -66,7 +66,8 @@ void PV::decidecommand(){
     if (Serial.available() > 0) {
       dist_ID = (byte)(Serial.read() - '0');
       Serial.print("dist ID :");
-      Serial.println(dist_ID);
+      Serial.print(dist_ID);
+      Serial.print(" ");
       break;
     }
   }
@@ -171,14 +172,11 @@ void PV::sendPacket(int N){
     for(j=1;j<256;j<<=1){
       if(*p&j){
         sendOne();
-        //Serial.print(1);
       }else{
         sendZero();
-        //Serial.print(0);
       }
     }
   }
-  Serial.println("Send!!");
   sendPostamble();
 }
 
@@ -191,93 +189,84 @@ void PV::setcommand(byte command){
     }
 }
 
-void PV::resvPacket(){
-
-
-  if(flag == 0){
-    Serial.println("please enter dist ID and command");
-    Serial.println("command 1-datareq 3-communicate");
-    flag = 1;
+void PV::showpacket(){
+  for(int i =0;i<20;i++){
+    Serial.print(packet[i]);
+    Serial.print(" ");
   }
+  Serial.println("");
+}
 
-    //command送信側となる
-    if (Serial.available() > 0){
-      flag = 0;
-      init();
-      getstatus();
-      decidecommand();
-      createpacket();
-      //showstatus();
-      //確認用
-      for(int i =0;i<20;i++){
-        Serial.print(packet[i]);
-        Serial.print(" ");
+void PV::resvPacket(){
+  //command送信側となる
+  if (Serial.available() > 0){
+    init();
+    getstatus();
+    decidecommand();
+    createpacket();
+    Serial.print("send ");
+    showpacket();
+    sendPacket(getlpacket());
+  }
+  //受信部分
+  sig=analogRead(CT_SIGNAL);
+  if(sig-psig>150){
+    // 9 ==> 0;  16 ==> 1  (13 should be the threshold)
+    if(duration_counter<5){
+      // Do Nothing (destroy garbage)
+    }else if(duration_counter<13){
+      //this_bit=0;
+      if(++bit_index>=5){
+        byte byte_index=(bit_index-5)>>3;
+        //Serial.println(byte_index);
+        packet[byte_index]>>=1;
       }
-      Serial.println("");
-      sendPacket(getlpacket());
-    }
-    //受信部分
-    sig=analogRead(CT_SIGNAL);
-    if(sig-psig>150){
-      //Serilal.println(duration_counter);
-      // 9 ==> 0;  16 ==> 1  (13 should be the threshold)
-      if(duration_counter<5){
-        // Do Nothing (destroy garbage)
-      }else if(duration_counter<13){
-        //this_bit=0;
-        if(++bit_index>=5){
-          byte byte_index=(bit_index-5)>>3;
-          //Serial.println(byte_index);
-          packet[byte_index]>>=1;
-        }
-      }else if(duration_counter<26){
-        //this_bit=1;
-        if(++bit_index>=5){
-          byte byte_index=(bit_index-5)>>3;
-          //Serial.println(byte_index);
-          packet[byte_index]>>=1;
-          packet[byte_index]|=0x80;
-        }
-      }else{
-        //  this_bit=2;   // start -- detected
-        bit_index=0;
-        n_recv_packet=0;
+    }else if(duration_counter<26){
+      //this_bit=1;
+      if(++bit_index>=5){
+        byte byte_index=(bit_index-5)>>3;
+        //Serial.println(byte_index);
+        packet[byte_index]>>=1;
+        packet[byte_index]|=0x80;
       }
-      duration_counter=0;
+    }else{
+      //  this_bit=2;   // start -- detected
+      bit_index=0;
+      n_recv_packet=0;
     }
-    psig=sig;
+    duration_counter=0;
+  }
+  psig=sig;
 
-    //解読部分
-    if(++duration_counter>5000 && bit_index>=20){
-      for(int j = 0;j<20 ;j++){
-        Serial.print(packet[j]);
-        Serial.print(" ");
-      }
-      Serial.println(" ");
-      // break detected
-      digitalWrite(LED_RX,HIGH);
-        if (packet[0] == ID) {
-          //なぜか4
-          n_recv_packet=(bit_index-4)>>3;
-          unsigned short recv_packet_crc=crc(packet,n_recv_packet -1 );
-          if(packet[n_recv_packet-1]==byte(recv_packet_crc)){
-            if (packet[1] == DataReq){ //決め打ちcommand受信
-              //送信モードに入る必要あり
-              getstatus();
-              dist_ID = packet[3]; //distID command length ID
-              //受信した命令に対してcommnadを設定
-              setcommand(packet[1]);
-              createpacket();
-              // infoは5byteなのでsnedPacketの引数5
-              sendPacket(5);
-            }else if (packet[1] == DataResp){
-              Serial.print("ID="); Serial.print(packet[3]);
-              Serial.print("; V="); Serial.print(packet[4]);
-              Serial.print("; T="); Serial.println(packet[5]);
-            }
-          }
+  //解読部分
+  if(++duration_counter>5000 && bit_index>=20){
+    Serial.print("resv ");
+    showpacket();
+    // break detected
+    digitalWrite(LED_RX,HIGH);
+    if (packet[0] == ID) {
+      n_recv_packet=(bit_index-4)>>3;
+      unsigned short recv_packet_crc=crc(packet,n_recv_packet -1 );
+      if(packet[n_recv_packet-1]==byte(recv_packet_crc)){
+        if (packet[1] == DataReq){ //決め打ちcommand受信
+          //送信モードに入る必要あり
+          getstatus();
+          dist_ID = packet[3]; //distID command length ID
+          //受信した命令に対してcommnadを設定
+          setcommand(packet[1]);
+          createpacket();
+          // infoは5byteなのでsnedPacketの引数5
+          Serial.print("send ");
+          showpacket();
+          sendPacket(getlpacket());
+        }else if (packet[1] == DataResp){
+          Serial.print("ID="); Serial.print(packet[3]);
+          Serial.print("; V="); Serial.print(packet[4]);
+          Serial.print("; T="); Serial.println(packet[5]);
         }
-        digitalWrite(LED_RX,LOW);
-        init();
+      }
     }
+    digitalWrite(LED_RX,LOW);
+    init();
+  }
 }

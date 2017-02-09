@@ -53,6 +53,8 @@ public:
 	void createpacket();
 	void init();
 	int getlpacket();
+	void showpacket();
+	//確認用
 
 private:
   byte ID;
@@ -67,7 +69,6 @@ private:
 	int lpacket = 2;
 	int bit_index = 0;
 	//コメント表示用
-	bool flag = 0;
 	int sig=0;
 	int psig=0;
 	byte this_bit=0;
