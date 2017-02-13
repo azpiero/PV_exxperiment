@@ -1,3 +1,5 @@
+//LF only
+
 #include <PVcommunicate.h>
 
 PV pv;
