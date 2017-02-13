@@ -78,6 +78,8 @@ void PV::decidecommand(){
       break;
     }
   }
+  Serial.read();
+  //改行文字
 }
 
 void PV::init(){
@@ -100,7 +102,6 @@ int PV::getlpacket(){
 
 void PV::createpacket(){
   int i = 4;
-  int t = 0;
   sendpacket[0] = dist_ID;
   sendpacket[1] = _command;
   //lpacket必要な場面少なそう
@@ -111,14 +112,17 @@ void PV::createpacket(){
       break;
     case communicate :
       Serial.println("please enter message");
-      while(t<10){
+      while(1){
         if(Serial.available()>0){
-          sendpacket[i] = (byte)(Serial.read());
-          i++;
-          lpacket ++;
+          char buff ;
+          if((buff = (byte)(Serial.read())) == '\n'){
+            break;
+          }else{
+            sendpacket[i] = buff;
+            i++;
+            lpacket ++;
+          }
         }
-        delay(1000);
-        t++;
       }
       break;
     case DataResp :
@@ -215,8 +219,8 @@ void PV::resvPacket(){
     getstatus();
     decidecommand();
     createpacket();
-    Serial.print("send ");
-    showpacket();
+    Serial.print("send command!");
+    //showpacket();
     sendPacket(getlpacket());
     flag = 1;
   }
@@ -251,8 +255,7 @@ void PV::resvPacket(){
 
   //解読部分
   if(++duration_counter>5000 && bit_index>0){
-    Serial.print("resv ");
-    showpacket();
+    //showpacket();
     // break detected
     digitalWrite(LED_RX,HIGH);
     if (packet[0] == ID) {
@@ -260,6 +263,7 @@ void PV::resvPacket(){
       unsigned short recv_packet_crc=crc(packet,n_recv_packet -1 );
       if(packet[n_recv_packet-1]==byte(recv_packet_crc)){
         if (packet[1] == DataReq){ //決め打ちcommand受信
+          Serial.println("recv DataReq!");
           //送信モードに入る必要あり
           delay(1000);
           getstatus();
@@ -268,18 +272,20 @@ void PV::resvPacket(){
           setcommand(DataResp);
           createpacket();
           // infoは5byteなのでsnedPacketの引数5
-          Serial.print("send ");
-          showpacket();
+          Serial.print("send response!");
+          //showpacket();
           sendPacket(getlpacket());
         }else if (packet[1] == DataResp){
+          Serial.println("recv DataResp!");
           Serial.print("ID="); Serial.print(packet[3]);
           Serial.print("; V="); Serial.print(packet[4]);
           Serial.print("; T="); Serial.println(packet[5]);
         }else if (packet[1] == communicate){ //決め打ちcommand受信
+          Serial.println("recv Communicate!");
           //中身を文字として表示したい
           //content の長さは
           for(int i =4;i<packet[2];i++){
-            Serial.print(packet[i]);
+            Serial.print(char(packet[i]));
           }
         }else if(packet[1] == Error){
           sendPacket(getlpacket());
@@ -292,7 +298,7 @@ void PV::resvPacket(){
           setcommand(Error);
           createpacket();
           Serial.print("send ");
-          showpacket();
+          //showpacket();
           sendPacket(getlpacket());
           //error報告
         }else if(flag == 1){
