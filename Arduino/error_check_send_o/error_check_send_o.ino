@@ -18,7 +18,7 @@
 #define SW_BIT4 8
 #define SW_BIT5 9
 #define SW_TRANSMIT 11
-#define N 2
+#define N 10
 
 // デバイスの状態
 byte device_id=0;
@@ -85,10 +85,10 @@ void sendPacket(){
     for(j=1;j<256;j<<=1){
       if(*p&j){
         sendOne();
-        Serial.print(1);
+        //Serial.print(1);
       }else{
         sendZero();
-        Serial.print(0);
+        //Serial.print(0);
       }
     }
   }
@@ -112,26 +112,6 @@ void setup(){
   pinMode(SW_TRANSMIT,INPUT_PULLUP);
 }
 
-// mainルーチン
-void loop(){
-  for(int i = 0;i<N-1;i++){
-    //send_packet[i]=random(-128,127);
-    send_packet[i] = 0;
-  }
-  unsigned short send_packet_crc=crc(send_packet,N-1);
-  send_packet[N-1]=byte(send_packet_crc);
-  
-  digitalWrite(LED_TX,HIGH);
-  sendPacket();
-  delay(1000);
-  digitalWrite(LED_TX,LOW);
-  /*
-  for(int i=0;i<5;i++){
-    delay(1000);
-  }
-  */
-}
-
 // CRC16の計算アルゴリズム
 unsigned short crc( unsigned const char *pData, unsigned long lNum )
 {
@@ -151,4 +131,28 @@ unsigned short crc( unsigned const char *pData, unsigned long lNum )
   }
   return (unsigned short)(crc16);
 }
+
+
+
+// mainルーチン
+void loop(){
+  for(int i = 0;i<N-1;i++){
+    send_packet[i]=random(-128,127);
+    Serial.print(send_packet[i]);
+    Serial.print(" ");
+  }
+  unsigned short send_packet_crc=crc(send_packet,N-1);
+  send_packet[N-1]=byte(send_packet_crc);
+  
+  digitalWrite(LED_TX,HIGH);
+  sendPacket();
+  delay(1000);
+  digitalWrite(LED_TX,LOW);
+  /*
+  for(int i=0;i<5;i++){
+    delay(1000);
+  }
+  */
+}
+
 

@@ -7,7 +7,6 @@
 #include "WProgram.h"
 #endif
 
-
 unsigned short crc( unsigned const char *pData, unsigned long lNum )
 {
   unsigned int crc16 = 0xFFFFU;
@@ -81,7 +80,6 @@ void PV::decidecommand(){
   }
 }
 
-
 void PV::init(){
   lpacket = 2;
   bit_index =0;
@@ -89,9 +87,10 @@ void PV::init(){
   psig=0;
   this_bit=0;
   n_recv_packet=0;
-  duration_counter=0;
+  duration_counter=5000;
   for(int i =0;i<20;i++){
     packet[i] = 0;
+    sendpacket[i]=0;
   }
 }
 
@@ -102,19 +101,19 @@ int PV::getlpacket(){
 void PV::createpacket(){
   int i = 4;
   int t = 0;
-  packet[0] = dist_ID;
-  packet[1] = _command;
+  sendpacket[0] = dist_ID;
+  sendpacket[1] = _command;
   //lpacket必要な場面少なそう
-  packet[3] = ID;
+  sendpacket[3] = ID;
   switch(_command){
-  case DataReq :
-    Serial.println("request dist PV status");
-    break;
+    case DataReq :
+      Serial.println("request dist PV status");
+      break;
     case communicate :
       Serial.println("please enter message");
       while(t<10){
         if(Serial.available()>0){
-          packet[i] = (byte)(Serial.read());
+          sendpacket[i] = (byte)(Serial.read());
           i++;
           lpacket ++;
         }
@@ -124,13 +123,18 @@ void PV::createpacket(){
       break;
     case DataResp :
       getstatus();
-      packet[4] = voltage;
-      packet[5] = temperature;
+      sendpacket[4] = voltage;
+      sendpacket[5] = temperature;
       lpacket = 4;
       break;
-  }
-  packet[2] = (byte)lpacket;
-  packet[lpacket+2]=byte(crc(packet,lpacket+2));
+    case Error :
+      //error 内容
+      sendpacket[4] = 0;
+      lpacket = 3;
+      break;
+    }
+  sendpacket[2] = (byte)lpacket;
+  sendpacket[lpacket+2]=byte(crc(sendpacket,lpacket+2));
   //lpacket + 2(command +dist_ID ) is all packet length
 }
 
@@ -165,31 +169,36 @@ void sendPostamble(){
 
 //for loopの回数を調整 引数で渡せばいいか
 void PV::sendPacket(int N){
+  //試し
+  //unsigned long time;
+  //unsigned long ptime;
   int i,j;
-  byte* p=packet;
+  byte* p=sendpacket;
   sendPreamble();
   for(i=0;i<N+3;i++,p++){
     for(j=1;j<256;j<<=1){
+      //time = micros();
       if(*p&j){
         sendOne();
       }else{
         sendZero();
       }
+      //Serial.println(time - ptime);
+      //ptime = time;
     }
   }
   sendPostamble();
 }
 
-
 void PV::setcommand(byte command){
-  switch (command){
-    case DataReq:
-      _command = DataResp ;
-      break;
-    }
+  _command = DataResp ;
 }
 
 void PV::showpacket(){
+  for(int i =0;i<20;i++){
+    Serial.print(sendpacket[i]);
+    Serial.print(" ");
+  }
   for(int i =0;i<20;i++){
     Serial.print(packet[i]);
     Serial.print(" ");
@@ -198,6 +207,8 @@ void PV::showpacket(){
 }
 
 void PV::resvPacket(){
+  bool flag = 0;
+  //送信者が受信者か(送信者が1になる)
   //command送信側となる
   if (Serial.available() > 0){
     init();
@@ -207,10 +218,12 @@ void PV::resvPacket(){
     Serial.print("send ");
     showpacket();
     sendPacket(getlpacket());
+    flag = 1;
   }
   //受信部分
   sig=analogRead(CT_SIGNAL);
-  if(sig-psig>150){
+  //このスレッショルドを低くすると見逃しへる　but 見間違えも増える？？
+  if(sig-psig>80){
     // 9 ==> 0;  16 ==> 1  (13 should be the threshold)
     if(duration_counter<5){
       // Do Nothing (destroy garbage)
@@ -218,28 +231,26 @@ void PV::resvPacket(){
       //this_bit=0;
       if(++bit_index>=5){
         byte byte_index=(bit_index-5)>>3;
-        //Serial.println(byte_index);
         packet[byte_index]>>=1;
       }
     }else if(duration_counter<26){
       //this_bit=1;
       if(++bit_index>=5){
         byte byte_index=(bit_index-5)>>3;
-        //Serial.println(byte_index);
         packet[byte_index]>>=1;
         packet[byte_index]|=0x80;
       }
     }else{
+      //ここ入るときはパルス見逃している
       //  this_bit=2;   // start -- detected
-      bit_index=0;
-      n_recv_packet=0;
+      //bit_index=0;
     }
     duration_counter=0;
   }
   psig=sig;
 
   //解読部分
-  if(++duration_counter>5000 && bit_index>=20){
+  if(++duration_counter>5000 && bit_index>0){
     Serial.print("resv ");
     showpacket();
     // break detected
@@ -250,10 +261,11 @@ void PV::resvPacket(){
       if(packet[n_recv_packet-1]==byte(recv_packet_crc)){
         if (packet[1] == DataReq){ //決め打ちcommand受信
           //送信モードに入る必要あり
+          delay(1000);
           getstatus();
           dist_ID = packet[3]; //distID command length ID
           //受信した命令に対してcommnadを設定
-          setcommand(packet[1]);
+          setcommand(DataResp);
           createpacket();
           // infoは5byteなのでsnedPacketの引数5
           Serial.print("send ");
@@ -263,10 +275,39 @@ void PV::resvPacket(){
           Serial.print("ID="); Serial.print(packet[3]);
           Serial.print("; V="); Serial.print(packet[4]);
           Serial.print("; T="); Serial.println(packet[5]);
+        }else if (packet[1] == communicate){ //決め打ちcommand受信
+          //中身を文字として表示したい
+          //content の長さは
+          for(int i =4;i<packet[2];i++){
+            Serial.print(packet[i]);
+          }
+        }else if(packet[1] == Error){
+          sendPacket(getlpacket());
         }
+      }else{
+        //受信サイド error返信
+        if(flag == 0){
+          Serial.println("receive answer incorrectly");
+          dist_ID = packet[3];
+          setcommand(Error);
+          createpacket();
+          Serial.print("send ");
+          showpacket();
+          sendPacket(getlpacket());
+          //error報告
+        }else if(flag == 1){
+          //送信サイド
+          Serial.println(flag);
+          Serial.println("receive answer incorrectly");
+          //同じものをそうしん
+          sendPacket(getlpacket());
+        }
+        //とりあえず再送要求
+        //送信したパケットが消えていて欲しくないかも
       }
     }
     digitalWrite(LED_RX,LOW);
     init();
+    flag = 0;
   }
 }

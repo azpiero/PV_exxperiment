@@ -66,6 +66,8 @@ private:
 	// std::vector<byte> resp_packet;
 	//可変長にしたいけどひとまず保留
 	byte packet[20];
+	//再送用にsend recv 分断
+	byte sendpacket[20];
 	int lpacket = 2;
 	int bit_index = 0;
 	//コメント表示用
