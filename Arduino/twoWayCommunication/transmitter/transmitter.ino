@@ -1,7 +1,7 @@
 /**************************************************/
-/*  Smart PV Transceiver . Transmitter Prototype  */
+/*  Smart PV Transceiver . Receiver Prototype     */
 /*  create: 2016-10-07                            */
-/*  update: 2016-11-28                            */
+/*  update: 2016-10-07                            */
 /**************************************************/
 
 // ピンレイアウトの定義
@@ -19,15 +19,36 @@
 #define SW_BIT5 9
 #define SW_TRANSMIT 11
 
-// デバイスの状態
-byte dest_id; //added
+#define PULSE_DRIVE_DURATION    200
+#define PULSE_ZERO_DURATION     800
+#define PULSE_ONE_DURATION     1600
+#define PULSE_BREAK_DURATION   5000
+
+int duration_counter=0;
+int bit_index=0;
+byte preamble=0;
+
+byte recv_packet[5]; //ID-command-V_I-CRC
+byte send_packet[3]; //ID-commnad-CRC (自分のIDを入力しておく？)
+byte n_recv_packet=0;
+
 byte device_id=0;
 byte voltage=0;
 byte temperature=0;
 
-byte command = 0; //added
+void createCommand(){
+  //ここで目的ノードと命令を指定させる[0][1]
+  for(int i =0;i<2;i++){
+    (Serial.available() > 0) {
+    send_packet[i] = Serial.read(); //device id
+    i ++;
+    }
+  }
+  unsigned short send_packet_crc=crc(send_packet,2);
+  send_packet[2]=byte(send_packet_crc);
+}
 
-// デバイスの状態の取得
+//証明としている？
 void getDeviceStatus(){        device_id=0;
   if(digitalRead(SW_BIT0)==LOW){ device_id+=1; }
   if(digitalRead(SW_BIT1)==LOW){ device_id+=2; }
@@ -43,34 +64,6 @@ void getDeviceStatus(){        device_id=0;
   temperature=(byte)(temp*500/1024);
 }
 
-//この辺をcppやhで簡潔に書きたい
-byte send_packet[6];
-void createSendVTPacket(){
-  send_packet[0]=dest_id; 
-  send_packet[1]=command;
-  send_packet[2]=device_id;
-  send_packet[3]=voltage;
-  send_packet[4]=temperature;
-  unsigned short send_packet_crc=crc(send_packet,5);
-  send_packet[5]=byte(send_packet_crc);
-//  send_packet[6]=byte(send_packet_crc>>8);
-}
-
-void createSendLEDPacket(){
-  send_packet[0]=dest_id; 
-  send_packet[1]=command;
-  // 0-OFF 1-ON
-  send_packet[2]= 1; //仮定で1
-  unsigned short send_packet_crc=crc(send_packet,3);
-  send_packet[3]=byte(send_packet_crc);
-//  send_packet[4]=byte(send_packet_crc>>8);
-}
-
-
-#define PULSE_DRIVE_DURATION    200
-#define PULSE_ZERO_DURATION     800
-#define PULSE_ONE_DURATION     1600
-#define PULSE_BREAK_DURATION   5000
 void sendZero(){
   digitalWrite(L_DRIVE,HIGH);
   delayMicroseconds(PULSE_DRIVE_DURATION);
@@ -100,26 +93,95 @@ void sendPostamble(){
   sendBreak();
 }
 
-void sendVTPacket(){
+//Nの個数だけbyte送信 →ID-command-CRCで問題ない
+void sendPacket(){
   int i,j;
-  byte* p=send_packet; //決め打ち...
+  byte* p=send_packet;
   sendPreamble();
-  for(i=0;i<6;i++,p++){ //packet数
-    for(j=1;j<256;j<<=1){ //256 1111 1111を1bitごとずらす 結局8回
+  for(i=0;i<3;i++,p++){
+    for(j=1;j<256;j<<=1){
       if(*p&j){
         sendOne();
+        Serial.print(1);
       }else{
         sendZero();
+        Serial.print(0);
       }
     }
   }
+  Serial.println("Send!!");
   sendPostamble();
+}
+
+void recvPacket(){
+  int sig;
+  int psig=analogRead(CT_SIGNAL);
+  byte this_bit;
+
+  n_recv_packet=0;
+  while(1){
+    sig=analogRead(CT_SIGNAL);
+    if(sig-psig>150){
+
+      // 9 ==> 0;  16 ==> 1  (13 should be the threshold)
+      if(duration_counter<5){
+        // Do Nothing (destroy garbage)
+      }else if(duration_counter<13){
+        //this_bit=0;
+        if(++bit_index>=5){
+          byte byte_index=(bit_index-5)>>3;
+          Serial.println(byte_index);
+          recv_packet[byte_index]>>=1;
+        }
+      }else if(duration_counter<26){
+        //this_bit=1;
+        if(++bit_index>=5){
+          byte byte_index=(bit_index-5)>>3;
+          Serial.println(byte_index);
+          recv_packet[byte_index]>>=1;
+          recv_packet[byte_index]|=0x80;
+        }
+      }else{
+      //  this_bit=2;   // start -- detected
+        bit_index=0;
+        n_recv_packet=0;
+      }
+      duration_counter=0;
+    }
+    psig=sig;
+
+    if(++duration_counter>5000 || bit_index>=255){
+
+      // break detected
+      if(bit_index>0){
+        digitalWrite(LED_RX,HIGH);
+
+        if(!((bit_index-4)&0x07)){
+          n_recv_packet=(bit_index-5)>>3;
+
+          if(n_recv_packet==4){
+            unsigned short recv_packet_crc=crc(recv_packet,3);
+            if(recv_packet[3]==byte(recv_packet_crc)){
+              Serial.print("ID="); Serial.print(recv_packet[0]);
+              Serial.print("; V="); Serial.print(recv_packet[1]);
+              Serial.print("; T="); Serial.println(recv_packet[2]);
+            }
+          }
+        }
+        digitalWrite(LED_RX,LOW);
+
+        bit_index=0;
+        break;
+      }
+      duration_counter=5000;
+    }
+  }
 }
 
 // 初期化プログラム
 void setup(){
-  Serial.begin(9600);
-
+  Serial.begin(115200);
+  //Serial.println("Starting...");
   pinMode(L_DRIVE,OUTPUT);
   pinMode(LED_TX,OUTPUT);
   pinMode(LED_RX,OUTPUT);
@@ -130,20 +192,19 @@ void setup(){
   pinMode(SW_BIT4,INPUT_PULLUP);
   pinMode(SW_BIT5,INPUT_PULLUP);
   pinMode(SW_TRANSMIT,INPUT_PULLUP);
+
+  for(int i = 0;i<N-1;i++){
+    //send_packet[i]=random(-128,127);
+    send_packet[i] = 0;
+  }
 }
 
 // mainルーチン
 void loop(){
-  command = 0x01; //これでVTと判断すると仮定
-  dest_id = 1; //これも仮定 送信するごとにincrementも手
-  getDeviceStatus();
-  createSendVTPacket();
-  digitalWrite(LED_TX,HIGH);
-  sendVTPacket();
-  delay(1000);
-  digitalWrite(LED_TX,LOW);
-
-  delay(5000);
+  //コマンド作成-送信-返答受信という流れ(受信受付時間は設けて来なかったら再送がいいかな)
+  createCommand();
+  sendPacket();
+  recvPacket();
 }
 
 // CRC16の計算アルゴリズム
