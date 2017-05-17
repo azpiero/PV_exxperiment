@@ -31,6 +31,8 @@
 #define ack 				6
 #define Error 			7
 #define resend			8
+#define disconnect	9
+#define recovery 		10
 
 
 #define PULSE_DRIVE_DURATION    200

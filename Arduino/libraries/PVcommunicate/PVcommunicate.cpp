@@ -136,6 +136,13 @@ void PV::createpacket(){
       sendpacket[4] = 0;
       lpacket = 3;
       break;
+    case disconnect :
+      //内容は不要なはず
+      lpacket = 2;
+      break;
+    case ack :
+      lpacket = 2;
+      break;
     }
   sendpacket[2] = (byte)lpacket;
   sendpacket[lpacket+2]=byte(crc(sendpacket,lpacket+2));
@@ -262,33 +269,61 @@ void PV::resvPacket(){
       n_recv_packet=(bit_index-4)>>3;
       unsigned short recv_packet_crc=crc(packet,n_recv_packet -1 );
       if(packet[n_recv_packet-1]==byte(recv_packet_crc)){
-        if (packet[1] == DataReq){ //決め打ちcommand受信
-          Serial.println("recv DataReq!");
-          //送信モードに入る必要あり
-          delay(1000);
-          getstatus();
-          dist_ID = packet[3]; //distID command length ID
-          //受信した命令に対してcommnadを設定
-          setcommand(DataResp);
-          createpacket();
-          // infoは5byteなのでsnedPacketの引数5
-          Serial.print("send response!");
-          //showpacket();
-          sendPacket(getlpacket());
-        }else if (packet[1] == DataResp){
-          Serial.println("recv DataResp!");
-          Serial.print("ID="); Serial.print(packet[3]);
-          Serial.print("; V="); Serial.print(packet[4]);
-          Serial.print("; T="); Serial.println(packet[5]);
-        }else if (packet[1] == communicate){ //決め打ちcommand受信
-          Serial.println("recv Communicate!");
-          //中身を文字として表示したい
-          //content の長さは
-          for(int i =4;i<packet[2];i++){
-            Serial.print(char(packet[i]));
-          }
-        }else if(packet[1] == Error){
-          sendPacket(getlpacket());
+        switch(packet[1]){
+          case DataReq :
+            Serial.println("recv DataReq!");
+            //送信モードに入る必要あり
+            //低速度の原因
+            delay(1000);
+            getstatus();
+            dist_ID = packet[3]; //distID command length ID
+            //受信した命令に対してcommnadを設定
+            setcommand(DataResp);
+            createpacket();
+            // infoは5byteなのでsnedPacketの引数5
+            Serial.print("send response!");
+            //showpacket();
+            sendPacket(getlpacket());
+            break;
+          case DataResp :
+            Serial.println("recv DataResp!");
+            Serial.print("ID="); Serial.print(packet[3]);
+            Serial.print("; V="); Serial.print(packet[4]);
+            Serial.print("; T="); Serial.println(packet[5]);
+            break;
+          case communicate : //決め打ちcommand受信
+            Serial.println("recv Communicate!");
+            //中身を文字として表示したい
+            //content の長さは 4からpacket length +2まで 2に注意
+            for(int i =4;i<packet[2]+2;i++){
+              Serial.print(char(packet[i]));
+            }
+            break;
+          case Error :
+            sendPacket(getlpacket());
+            break;
+          case ack :
+            Serial.print("Command was send correctly");
+            break;
+          case disconnect :
+            //順番としては　受信-ack送信-切断
+            //ack受診までまてばより確実だが．．．．
+            setcommand(ack);
+            createpacket();
+            sendPacket(getlpacket());
+            Serial.print("disconnect");
+            digitalWrite(disconnect,HIGH);
+            break;
+          case recovery :
+            digitalWrite(disconnect,LOW);
+            //これくらい待てば復帰できる?
+            delay(1600);
+            setcommand(ack);
+            createpacket();
+            sendPacket(getlpacket());
+            Serial.print("recovery");
+            break;
+
         }
       }else{
         //受信サイド error返信
