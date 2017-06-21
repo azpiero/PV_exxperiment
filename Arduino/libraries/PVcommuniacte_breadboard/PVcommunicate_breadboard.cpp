@@ -1,4 +1,4 @@
-#include "PVcommunicate.h"
+#include "PVcommunicate_breadboard.h"
 
 //おまじない
 #if defined(ARDUINO) && ARDUINO >= 100
@@ -26,30 +26,26 @@ unsigned short crc( unsigned const char *pData, unsigned long lNum )
   return (unsigned short)(crc16);
 }
 
+/*
 void PV::ltica(){
     digitalWrite(LED_RX,HIGH);
     delay(1000);
     digitalWrite(LED_RX,LOW);
     delay(1000);
 }
+*/
 
+void PV::generatepacket(){
+  createpacket();
+  showpacket();
+  sendPacket(getlpacket());
+}
 
 void PV::getstatus(){
-    byte device_id = 0;
-    if(digitalRead(SW_BIT0)==LOW){ device_id+=1; }
-    if(digitalRead(SW_BIT1)==LOW){ device_id+=2; }
-    if(digitalRead(SW_BIT2)==LOW){ device_id+=4; }
-    if(digitalRead(SW_BIT3)==LOW){ device_id+=8; }
-    if(digitalRead(SW_BIT4)==LOW){ device_id+=16; }
-    if(digitalRead(SW_BIT5)==LOW){ device_id+=32; }
-
-    ID = device_id;
-
-    int volt=analogRead(VOLTAGE);
-    voltage=(byte)((((long)volt*560UL/1024/12)*2+1)/2);  //  = AD*5/1024*(100+12)/12
-    int temp=analogRead(TEMPERATURE);
-    temperature=(byte)(temp*500/1024);
-
+  //fixed
+  ID = 1;
+  voltage = 5;
+  temperature = 20;
 }
 
 void PV::showstatus(){
@@ -83,6 +79,14 @@ void PV::decidecommand(){
 }
 
 void PV::init(){
+  /*
+  Vt = 0;
+  Vt_ = 0;
+  Vavg = 0;
+  Vavg_ = 0;
+  Vmax = 0;
+  */
+  error = 0;
   lpacket = 2;
   bit_index =0;
   sig=0;
@@ -98,6 +102,7 @@ void PV::init(){
 
 int PV::getlpacket(){
   return lpacket;
+  //lpacket は全てのパケットではないぞ
 }
 
 void PV::createpacket(){
@@ -132,14 +137,28 @@ void PV::createpacket(){
       lpacket = 4;
       break;
     case Error :
-      //error 内容
-      sendpacket[4] = 0;
+      //error 内容　今回はひとまず 0を送ります
+      sendpacket[4] = error;
       lpacket = 3;
       break;
+    case disconnect :
+      //内容は不要なはず
+      lpacket = 2;
+      break;
+    case recovery:
+      lpacket = 2;
+      break;
+    case ack :
+      lpacket = 2;
+      break;
     }
+
   sendpacket[2] = (byte)lpacket;
   sendpacket[lpacket+2]=byte(crc(sendpacket,lpacket+2));
-  //lpacket + 2(command +dist_ID ) is all packet length
+  //lpacket = lpacket + dist_ID + contencts
+  //CRC → made from all before packet
+  // +2 means ID and command
+  //all packet は lpacket +3がもっとも間違いがない
 }
 
 void sendZero(){
@@ -179,6 +198,7 @@ void PV::sendPacket(int N){
   int i,j;
   byte* p=sendpacket;
   sendPreamble();
+  //ここで+3送る仕様にしているので問題がない
   for(i=0;i<N+3;i++,p++){
     for(j=1;j<256;j<<=1){
       //time = micros();
@@ -192,10 +212,16 @@ void PV::sendPacket(int N){
     }
   }
   sendPostamble();
+  showpacket();
 }
 
 void PV::setcommand(byte command){
-  _command = DataResp ;
+  //_command = DateRespになっていた
+  _command = command ;
+}
+void PV::setdistID(byte distID){
+  //_command = DateRespになっていた
+  distID = _distID ;
 }
 
 void PV::showpacket(){
@@ -211,33 +237,37 @@ void PV::showpacket(){
 }
 
 void PV::resvPacket(){
-  bool flag = 0;
-  //送信者が受信者か(送信者が1になる)
-  //command送信側となる
   if (Serial.available() > 0){
     init();
     getstatus();
     decidecommand();
     createpacket();
-    Serial.print("send command!");
+    Serial.println("send command!");
     //showpacket();
     sendPacket(getlpacket());
-    flag = 1;
   }
   //受信部分
   sig=analogRead(CT_SIGNAL);
-  //このスレッショルドを低くすると見逃しへる　but 見間違えも増える？？
-  if(sig-psig>80){
+  if(sig-psig >100){
+    /*
+    Serial.print("pulse:");
+    Serial.println(duration_counter);
+    Serial.print("sig-psig");
+    Serial.println(sig);
+    Serial.println(psig);
+    */
     // 9 ==> 0;  16 ==> 1  (13 should be the threshold)
-    if(duration_counter<5){
+    if(duration_counter<20){
       // Do Nothing (destroy garbage)
-    }else if(duration_counter<13){
+    // 13 -> 10 10で分かれそうだった
+   }else if(duration_counter<100){
       //this_bit=0;
       if(++bit_index>=5){
+        //++が先に処理が来るから４ではなく5
         byte byte_index=(bit_index-5)>>3;
         packet[byte_index]>>=1;
       }
-    }else if(duration_counter<26){
+    }else if(duration_counter<200){
       //this_bit=1;
       if(++bit_index>=5){
         byte byte_index=(bit_index-5)>>3;
@@ -255,65 +285,107 @@ void PV::resvPacket(){
 
   //解読部分
   if(++duration_counter>5000 && bit_index>0){
-    //showpacket();
-    // break detected
-    digitalWrite(LED_RX,HIGH);
-    if (packet[0] == ID) {
+    showpacket();
+    //bit_index >0でそもそもbitあるかどうか
+    //+3はDistID,command,CRC
+    //bitの数があっているか
+    //broadcastに対応
+    if (packet[0] == ID || packet[0] == 255) {
       n_recv_packet=(bit_index-4)>>3;
-      unsigned short recv_packet_crc=crc(packet,n_recv_packet -1 );
-      if(packet[n_recv_packet-1]==byte(recv_packet_crc)){
-        if (packet[1] == DataReq){ //決め打ちcommand受信
-          Serial.println("recv DataReq!");
-          //送信モードに入る必要あり
-          delay(1000);
-          getstatus();
-          dist_ID = packet[3]; //distID command length ID
-          //受信した命令に対してcommnadを設定
-          setcommand(DataResp);
-          createpacket();
-          // infoは5byteなのでsnedPacketの引数5
-          Serial.print("send response!");
-          //showpacket();
-          sendPacket(getlpacket());
-        }else if (packet[1] == DataResp){
-          Serial.println("recv DataResp!");
-          Serial.print("ID="); Serial.print(packet[3]);
-          Serial.print("; V="); Serial.print(packet[4]);
-          Serial.print("; T="); Serial.println(packet[5]);
-        }else if (packet[1] == communicate){ //決め打ちcommand受信
-          Serial.println("recv Communicate!");
-          //中身を文字として表示したい
-          //content の長さは 4からpacket length +2まで 2に注意
-          for(int i =4;i<packet[2]+2;i++){
-            Serial.print(char(packet[i]));
+      Serial.println("ID is ok");
+      if (n_recv_packet == packet[2] + 3) {
+        Serial.println("packet size is ok");
+        unsigned short recv_packet_crc=crc(packet,n_recv_packet -1 );
+        if(packet[n_recv_packet-1]==byte(recv_packet_crc)){
+          switch(packet[1]){
+            case DataReq :
+              Serial.println("recv DataReq!");
+              delay(1000);
+              getstatus();
+              dist_ID = packet[3];
+              setcommand(DataResp);
+              generatepacket();
+              Serial.println("send response!");
+              break;
+            case DataResp :
+              Serial.println("recv DataResp!");
+              Serial.print("ID="); Serial.print(packet[3]);
+              Serial.print("; V="); Serial.print(packet[4]);
+              Serial.print("; T="); Serial.println(packet[5]);
+              break;
+            case communicate : //決め打ちcommand受信
+              Serial.println("recv Communicate!");
+            //中身を文字として表示したい
+            //content の長さは 4からpacket length +2まで 2に注意
+              for(int i =4;i<packet[2]+2;i++){
+                Serial.print(char(packet[i]));
+              }
+              break;
+            case check :
+              break;
+            case Error :
+              //delay(1000);
+              //errorで切り分け id/command/length/ownID/contents
+              switch(packet[4]){
+                case 1 :
+                  Serial.println("ERROR:CRC not match");
+                  break;
+                case 2 :
+                  Serial.println("ERROR:packet size is invalid");
+                  break;
+              }
+              /*
+              Serial.println("send message again");
+              showpacket();
+              sendPacket(getlpacket());
+              */
+              break;
+            case ack :
+              Serial.println("Command was send correctly");
+              break;
+            case disconnect :
+              //順番としては　受信-ack送信-切断
+              //ack受診までまてばより確実だが．．．．
+              setcommand(ack);
+              dist_ID = packet[3];
+              generatepacket();
+              Serial.println("disconnect");
+            //normally disconnect
+              digitalWrite(relay,HIGH);
+            //normally connect
+              digitalWrite(harvest,HIGH);
+              break;
+            case recovery :
+              digitalWrite(relay,LOW);
+              digitalWrite(harvest,LOW);
+            //これくらい待てば復帰できる?
+              delay(1600);
+              setcommand(ack);
+              dist_ID = packet[3];
+              generatepacket();
+              Serial.println("recovery");
+              break;
+            }
+          }else{
+            Serial.println("CRC not match");
+            setcommand(Error);
+            error = 1;
+            //error内容
+            dist_ID = packet[3];
+            generatepacket();
           }
-        }else if(packet[1] == Error){
-          sendPacket(getlpacket());
-        }
+        //次はbit数がおかしい
       }else{
-        //受信サイド error返信
-        if(flag == 0){
-          Serial.println("receive answer incorrectly");
-          dist_ID = packet[3];
-          setcommand(Error);
-          createpacket();
-          Serial.print("send ");
-          //showpacket();
-          sendPacket(getlpacket());
-          //error報告
-        }else if(flag == 1){
-          //送信サイド
-          Serial.println(flag);
-          Serial.println("receive answer incorrectly");
-          //同じものをそうしん
-          sendPacket(getlpacket());
-        }
-        //とりあえず再送要求
-        //送信したパケットが消えていて欲しくないかも
+        Serial.println("number of bit is not good");
+        setcommand(Error);
+        dist_ID = packet[3];
+        error = 2;
+        //error内容
+        generatepacket();
       }
-    }
-    digitalWrite(LED_RX,LOW);
+    } // IDが違う 特に何もしなくて良さそう
+    //digitalWrite(LED_RX,LOW);
     init();
-    flag = 0;
+    //読み取り終了でinit実行
   }
 }

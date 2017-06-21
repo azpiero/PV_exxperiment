@@ -11,8 +11,10 @@
 //この辺の位置を要調整
 
 //送信側でも受信側からの返信をみたい
-//analogread 3
-#define CT_SIGNAL 3
+//analogread 2
+//3pinは多分死んだ
+#define CT_SIGNAL 5
+
 
 //聞き手になればひとまず省略化
 /*
@@ -23,9 +25,10 @@
 */
 
 //digital write 9
-#define L_DRIVE 9
+#define L_DRIVE 11
 //digital write for disconnect relay swwitch
-#define relay 8
+#define relay 10
+#define harvest 9
 
 //IDはとりあえず1で固定させる
 /*
@@ -40,16 +43,20 @@
 
 //command list こういう書き方でいいのか
 #define DataReq 		1
-#define syn 				2
+//#define syn 				2
+//add
+#define check			  2
+//必ずcheckを通す必要あり
 #define communicate 3
-#define Ltica 			4
+//#define Ltica 			4
 #define DataResp 		5
 #define ack 				6
 #define Error 			7
+//いらないかも
 #define resend			8
 // add command
 #define disconnect	9
-#define recovery		10
+#define recovery		4
 
 
 #define PULSE_DRIVE_DURATION    200
@@ -73,6 +80,7 @@ public:
 	void init();
 	int getlpacket();
 	void showpacket();
+	void generatepacket();
 	//確認用
 
 private:
@@ -82,6 +90,8 @@ private:
   byte voltage;
   byte temperature;
 	byte _command;
+	//error内容の表示
+	byte error;
 	// std::vector<byte> send_packet;
 	// std::vector<byte> resp_packet;
 	//可変長にしたいけどひとまず保留
@@ -94,8 +104,20 @@ private:
 	int sig=0;
 	int psig=0;
 	byte this_bit=0;
+	//byte?
 	byte n_recv_packet=0;
 	int duration_counter=0;
+
+	//平均値などの選定用
+	//8bit整数
+	/*
+	byte Vt;
+	byte Vt_;
+	byte Vavg;
+	byte Vavg_;
+	byte Vmax;
+	int threshold;
+	*/
 };
 
 #endif
