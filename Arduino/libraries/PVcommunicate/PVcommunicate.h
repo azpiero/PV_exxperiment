@@ -24,15 +24,14 @@
 
 //command list こういう書き方でいいのか
 #define DataReq 		1
-#define syn 				2
+#define check				2
 #define communicate 3
-#define Ltica 			4
 #define DataResp 		5
 #define ack 				6
 #define Error 			7
 #define resend			8
 #define disconnect	9
-#define recovery 		10
+#define recovery 		4
 
 
 #define PULSE_DRIVE_DURATION    200
@@ -50,13 +49,13 @@ public:
 	void setcommand(byte command);
   void sendPacket(int length);
   void resvPacket();
-	//debug
   void showstatus();
 	void createpacket();
 	void init();
 	int getlpacket();
 	void showpacket();
-	//確認用
+	//added
+	void generatepacket();
 
 private:
   byte ID;
@@ -64,6 +63,7 @@ private:
   byte voltage;
   byte temperature;
 	byte _command;
+	byte error;
 	// std::vector<byte> send_packet;
 	// std::vector<byte> resp_packet;
 	//可変長にしたいけどひとまず保留
