@@ -219,9 +219,9 @@ void PV::setcommand(byte command){
   //_command = DateRespになっていた
   _command = command ;
 }
-void PV::setdistID(byte distID){
+void PV::setdistID(byte _distID){
   //_command = DateRespになっていた
-  distID = _distID ;
+  dist_ID = _distID ;
 }
 
 void PV::showpacket(){

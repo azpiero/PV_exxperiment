@@ -81,6 +81,7 @@ public:
 	int getlpacket();
 	void showpacket();
 	void generatepacket();
+	void setdistID(byte _distID);
 	//確認用
 
 private:
