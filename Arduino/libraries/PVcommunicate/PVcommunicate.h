@@ -13,6 +13,8 @@
 #define TEMPERATURE A2
 #define LED_TX A3
 #define LED_RX A4
+
+/*oldone
 #define L_DRIVE 2
 #define SW_BIT0 4
 #define SW_BIT1 5
@@ -20,6 +22,20 @@
 #define SW_BIT3 7
 #define SW_BIT4 8
 #define SW_BIT5 9
+*/
+
+//new
+#define L_DRIVE 2
+#define relay 4
+//harvestは常にhighで！(Normally open)
+#define harvest 3
+#define SW_BIT0 5
+#define SW_BIT1 6
+#define SW_BIT2 7
+#define SW_BIT3 8
+#define SW_BIT4 9
+#define SW_BIT5 10
+
 #define SW_TRANSMIT 11
 
 //command list こういう書き方でいいのか
@@ -56,6 +72,11 @@ public:
 	void showpacket();
 	//added
 	void generatepacket();
+	void setdistID(byte dist_ID);
+	bool crccheck();
+	bool sizecheck();
+	unsigned long settimer();
+	unsigned long setpasttimer();
 
 private:
   byte ID;
@@ -78,6 +99,8 @@ private:
 	byte this_bit=0;
 	byte n_recv_packet=0;
 	int duration_counter=0;
+	unsigned long timer= 20000;
+	unsigned long timer= 20000;
 };
 
 #endif

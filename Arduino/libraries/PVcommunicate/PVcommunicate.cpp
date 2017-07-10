@@ -7,6 +7,14 @@
 #include "WProgram.h"
 #endif
 
+//heartbeat 返信をランダムにする
+unsigned long PV::settimer(){
+  return timer;
+}
+unsigned long PV::setpasttimer(){
+  return pasttimer;
+}
+
 void PV::generatepacket(){
   createpacket();
   showpacket();
@@ -216,6 +224,45 @@ void PV::setcommand(byte command){
   _command = command ;
 }
 
+void PV::setdistID(byte _distID){
+  //_command = DateRespになっていた
+  dist_ID = _distID ;
+}
+
+bool PV::sizecheck(){
+  n_recv_packet=(bit_index-4)>>3;
+  if ((n_recv_packet) == packet[2] + 3) ) {
+    Serial.println("packet size is ok");
+    return true;
+  }else{
+    Serial.println("packet size is NG");
+    setcommand(Error);
+    error= 2;
+    //error内容
+    generatepacket();
+    return false;
+  }
+}
+
+bool PV::crccheck(){
+  unsigned short recv_packet_crc=crc(packet,n_recv_packet -1 );
+  if(packet[n_recv_packet-1]==byte(recv_packet_crc)){
+    Serial.println("CRC is ok");
+    return true;
+  }else{
+    Serial.println("CRC is NG");
+    setcommand(Error);
+    error= 1;
+    //error内容
+    generatepacket();
+    return false;
+  }
+}
+
+
+unsigned long settimer();
+unsigned long setpasttimer();
+
 void PV::showpacket(){
   for(int i =0;i<20;i++){
     Serial.print(sendpacket[i]);
@@ -269,16 +316,10 @@ void PV::resvPacket(){
   //解読部分
   if(++duration_counter>5000 && bit_index>0){
     showpacket();
-    // break detected
     digitalWrite(LED_RX,HIGH);
-    //broadcastに対応
-    if (packet[0] == ID || packet[0] == 255) {
-      n_recv_packet=(bit_index-4)>>3;
-      Serial.println("ID is ok");
-      if (!((n_recv_packet) == packet[2] + 3) ) {
-        Serial.println("packet size is ok");
-        unsigned short recv_packet_crc=crc(packet,n_recv_packet -1 );
-        if(packet[n_recv_packet-1]==byte(recv_packet_crc)){
+    if (packet[0] == ID) {
+      if(sizecheck()){
+        if(crccheck()){
           switch(packet[1]){
             case DataReq :
               Serial.println("recv DataReq!");
@@ -325,48 +366,52 @@ void PV::resvPacket(){
               Serial.println("Command was send correctly");
               break;
             case disconnect :
-              //順番としては　受信-ack送信-切断
-              //ack受診までまてばより確実だが．．．
-              /*．
               setcommand(ack);
+              dist_ID = packet[3];
               generatepacket();
               Serial.println("disconnect");
-            //normally disconnect
+              //normally disconnect
               digitalWrite(relay,HIGH);
-            //normally connect
-              digitalWrite(harvest,HIGH);
-              */
+              //normally OPEN
+              //if NC , LOW -> HIGH
+              digitalWrite(harvest,LOW);
+            break;
               break;
             case recovery :
-            /*
               digitalWrite(relay,LOW);
-              digitalWrite(harvest,LOW);
-            //これくらい待てば復帰できる?
+              //normally OPEN
+              //if NC , HIGH -> LOW
+              digitalWrite(harvest,HIGH);
+              //これくらい待てば復帰できる?
               delay(1600);
               setcommand(ack);
+              dist_ID = packet[3];
               generatepacket();
               Serial.println("recovery");
-            */
-              break;
+                break;
+              }
             }
-          }else{
-            Serial.println("CRC not match");
-            setcommand(Error);
-            error = 1;
-            //error内容
-            generatepacket();
           }
-        //次はbit数がおかしい
-      }else{
-        Serial.println("number of bit is not good");
-        setcommand(Error);
-        error = 2;
-        //error内容
-        generatepacket();
-      }
-    } // IDが違う 特に何もしなくて良さそう
-  }
+      }else if(packet[0] == 255){
+        if(sizecheck()){
+          if(crccheck()){
+            switch(packet[1]){
+              case DataReq :
+                Serial.println("recv heartbeat!");
+                getstatus();
+                setdistID(packet[3]);
+                setcommand(DataResp);
+                pasttimer=timer;
+                timer = random(20000);
+                //多分ここを.ino上で行えば良い？？
+                generatepacket();
+                Serial.println("send response!");
+                break;
+              }
+            }
+          }
+        }
     //digitalWrite(LED_RX,LOW);
   init();
-    //読み取り終了でinit実行
+  }
 }

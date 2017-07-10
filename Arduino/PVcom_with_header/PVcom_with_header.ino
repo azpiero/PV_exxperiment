@@ -10,6 +10,8 @@ void setup(){
   pinMode(L_DRIVE,OUTPUT);
   pinMode(LED_TX,OUTPUT);
   pinMode(LED_RX,OUTPUT);
+  pinMode(test3,OUTPUT);
+  pinMode(test4,OUTPUT);
   pinMode(SW_BIT0,INPUT_PULLUP);
   pinMode(SW_BIT1,INPUT_PULLUP);
   pinMode(SW_BIT2,INPUT_PULLUP);
@@ -33,6 +35,15 @@ void loop(){
   pv.createpacket();
   pv.showstatus();
   pv.sendpacket(pv.getlpacket());*/
-  //delay(1000);
-
+  pv.getstatus();
+  pv.showstatus();
+  delay(1000);
+  digitalWrite(test3,HIGH);
+  Serial.println("test3");
+  delay(1000);
+  digitalWrite(test3,LOW);
+  digitalWrite(test4,HIGH);
+  Serial.println("test4");
+  delay(1000);
+  digitalWrite(test4,LOW);
 }
