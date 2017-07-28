@@ -1,4 +1,4 @@
-#include "PVcommunicate.h"
+#include "PV_comdis.h"
 
 //おまじない
 #if defined(ARDUINO) && ARDUINO >= 100
@@ -6,14 +6,6 @@
 #else
 #include "WProgram.h"
 #endif
-
-//heartbeat 返信をランダムにする
-unsigned long PV::settimer(){
-  return timer;
-}
-unsigned long PV::setpasttimer(){
-  return pasttimer;
-}
 
 void PV::generatepacket(){
   createpacket();
@@ -41,30 +33,27 @@ unsigned short crc( unsigned const char *pData, unsigned long lNum )
 }
 
 void PV::ltica(){
-    digitalWrite(LED_RX,HIGH);
-    delay(1000);
-    digitalWrite(LED_RX,LOW);
-    delay(1000);
+  digitalWrite(LED_RX,HIGH);
+  delay(1000);
+  digitalWrite(LED_RX,LOW);
+  delay(1000);
 }
 
-
 void PV::getstatus(){
-    byte device_id = 0;
-    if(digitalRead(SW_BIT0)==LOW){ device_id+=1; }
-    if(digitalRead(SW_BIT1)==LOW){ device_id+=2; }
-    if(digitalRead(SW_BIT2)==LOW){ device_id+=4; }
-    if(digitalRead(SW_BIT3)==LOW){ device_id+=8; }
-    if(digitalRead(SW_BIT4)==LOW){ device_id+=16; }
-    if(digitalRead(SW_BIT5)==LOW){ device_id+=32; }
+  byte device_id = 0;
+  if(digitalRead(SW_BIT0)==LOW){ device_id+=1; }
+  if(digitalRead(SW_BIT1)==LOW){ device_id+=2; }
+  if(digitalRead(SW_BIT2)==LOW){ device_id+=4; }
+  if(digitalRead(SW_BIT3)==LOW){ device_id+=8; }
+  if(digitalRead(SW_BIT4)==LOW){ device_id+=16; }
+  if(digitalRead(SW_BIT5)==LOW){ device_id+=32; }
+  ID = device_id;
 
-    ID = device_id;
-
-    int volt=analogRead(VOLTAGE);
+  int volt=analogRead(VOLTAGE);
     //256or512段階
-    voltage=(byte)((((long)volt*560UL/1024/12)*2+1)/2);  //  = AD*5/1024*(100+12)/12
-    int temp=analogRead(TEMPERATURE);
-    temperature=(byte)(temp*500/1024);
-
+  voltage=(byte)((((long)volt*560UL/1024/12)*2+1)/2);  //  = AD*5/1024*(100+12)/12
+  int temp=analogRead(TEMPERATURE);
+  temperature=(byte)(temp*500/1024);
 }
 
 void PV::showstatus(){
@@ -76,25 +65,43 @@ void PV::showstatus(){
 }
 
 void PV::decidecommand(){
-  while(1){
-    if (Serial.available() > 0) {
-      dist_ID = (byte)(Serial.read() - '0');
-      Serial.print("dist ID :");
-      Serial.print(dist_ID);
-      Serial.print(" ");
-      break;
+  char buff;
+  buff = (byte)(Serial.read());
+
+  if(decidecommandflag){
+    switch(decidecommnadcounter){
+      case 0:
+        dist_ID = buff - '0';
+        Serial.print("dist ID :");
+        Serial.print(dist_ID);
+        Serial.print(" ");
+        decidecommnadcounter++;
+        break;
+      case 1:
+        _command = buff - '0';
+        Serial.print("commnad :");
+        Serial.println(_command);
+        decidecommnadcounter++;
+        break;
+      }
     }
+
+  switch (buff) {
+    case 's' :
+    Serial.println("stop heartbeat");
+    MsTimer2::stop();
+    case 'r' :
+    Serial.println("restart heartbeat");
+    MsTimer2::start();
+    case '\n' :
+    decidecommandflag = false;
+    decidecommnadcounter = 0;
+    break;
+    case 'A' :
+    decidecommandflag = true;
+    //これで14とかのcommandを受け取れる
+    break;
   }
-  while(1){
-    if (Serial.available() > 0){
-      _command = (byte)(Serial.read() - '0');
-      Serial.print("commnad :");
-      Serial.println(_command);
-      break;
-    }
-  }
-  Serial.read();
-  //改行文字
 }
 
 void PV::init(){
@@ -108,7 +115,8 @@ void PV::init(){
   duration_counter=5000;
   for(int i =0;i<20;i++){
     packet[i] = 0;
-    sendpacket[i]=0;
+    //sendpacket[i]=0;
+    //受信したパケットはここでは初期化しない
   }
 }
 
@@ -197,12 +205,10 @@ void sendPostamble(){
   sendBreak();
 }
 
-//for loopの回数を調整 引数で渡せばいいか
 void PV::sendPacket(int N){
-  //試し
-  //unsigned long time;
-  //unsigned long ptime;
   int i,j;
+  //送信すればLEDが光る
+  digitalWrite(LED_TX,HIGH);
   byte* p=sendpacket;
   sendPreamble();
   for(i=0;i<N+3;i++,p++){
@@ -213,11 +219,15 @@ void PV::sendPacket(int N){
       }else{
         sendZero();
       }
-      //Serial.println(time - ptime);
-      //ptime = time;
     }
   }
   sendPostamble();
+
+  //再送はできなくなるけどsendpacket初期化の位置をここにしておく
+  for(int i =0;i<20;i++){
+    sendpacket[i] = 0;
+  }
+  digitalWrite(LED_TX,LOW);
 }
 
 void PV::setcommand(byte command){
@@ -225,13 +235,12 @@ void PV::setcommand(byte command){
 }
 
 void PV::setdistID(byte _distID){
-  //_command = DateRespになっていた
   dist_ID = _distID ;
 }
 
 bool PV::sizecheck(){
   n_recv_packet=(bit_index-4)>>3;
-  if ((n_recv_packet) == packet[2] + 3) ) {
+  if ((n_recv_packet) == packet[2] + 3) {
     Serial.println("packet size is ok");
     return true;
   }else{
@@ -259,10 +268,6 @@ bool PV::crccheck(){
   }
 }
 
-
-unsigned long settimer();
-unsigned long setpasttimer();
-
 void PV::showpacket(){
   for(int i =0;i<20;i++){
     Serial.print(sendpacket[i]);
@@ -275,29 +280,52 @@ void PV::showpacket(){
   Serial.println("");
 }
 
+//slave用のmasterからのheartbeatに対するwait関数
+int PV::waitID(){
+  Serial.println(int(ID)*1000);
+  return int(ID)*1000;
+}
+
 void PV::resvPacket(){
+
   if (Serial.available() > 0){
-    init();
+    //init();
     getstatus();
-    decidecommand();
-    createpacket();
-    Serial.print("send command!");
+    while(Serial.available() > 0){
+      decidecommand();
+    }
+    Serial.print("create command!");
+    generatepacket();
     //showpacket();
-    sendPacket(getlpacket());
   }
+
   //受信部分
   sig=analogRead(CT_SIGNAL);
-  if(sig-psig>80){
-    // 9 ==> 0;  16 ==> 1  (13 should be the threshold)
-    if(duration_counter<5){
+  //EEPROMで確認用
+  /*
+  if(EEPROM_counter >=0 && EEPROM_counter <256){
+    EEPROM_buffer[EEPROM_counter] = sig/4;
+    EEPROM_counter ++;
+    if(EEPROM_counter == 256){
+      for(int a=0;a<256;++a){
+        EEPROM.write(a,EEPROM_buffer[a]);
+        }
+    }
+ }
+ */
+  //Serial.println(sig);
+  if(sig >= 600 && psig < 600){
+    //if(EEPROM_counter == -1) EEPROM_counter =0;
+    //Serial.println(duration_counter);
+    if(duration_counter<30){
       // Do Nothing (destroy garbage)
-    }else if(duration_counter<13){
+    }else if(duration_counter<60){
       //this_bit=0;
       if(++bit_index>=5){
         byte byte_index=(bit_index-5)>>3;
         packet[byte_index]>>=1;
       }
-    }else if(duration_counter<26){
+    }else if(duration_counter<120){
       //this_bit=1;
       if(++bit_index>=5){
         byte byte_index=(bit_index-5)>>3;
@@ -314,9 +342,11 @@ void PV::resvPacket(){
   psig=sig;
 
   //解読部分
-  if(++duration_counter>5000 && bit_index>0){
-    showpacket();
+  if(++duration_counter>5000 && bit_index>4){
+    //ちゃんとパケットを確認したらLEDを光らせる
     digitalWrite(LED_RX,HIGH);
+    showpacket();
+    Serial.print("pulse detect!!");
     if (packet[0] == ID) {
       if(sizecheck()){
         if(crccheck()){
@@ -382,7 +412,6 @@ void PV::resvPacket(){
               //normally OPEN
               //if NC , HIGH -> LOW
               digitalWrite(harvest,HIGH);
-              //これくらい待てば復帰できる?
               delay(1600);
               setcommand(ack);
               dist_ID = packet[3];
@@ -392,26 +421,31 @@ void PV::resvPacket(){
               }
             }
           }
+      //this is heartbeat
       }else if(packet[0] == 255){
         if(sizecheck()){
           if(crccheck()){
             switch(packet[1]){
               case DataReq :
-                Serial.println("recv heartbeat!");
-                getstatus();
-                setdistID(packet[3]);
+                //切断復帰
+                //カチッと毎回なって欲しくないのでもしそうなるならif(digitalreadできないのでどうするかは不明w)
+                //bool relay で!で切り分けかなぁ
+                digitalWrite(relay,LOW);
+                digitalWrite(harvest,HIGH);
+                //Timerone上書き　できる？？
+                loopcounter =0;
+
+                dist_ID = packet[3];
                 setcommand(DataResp);
-                pasttimer=timer;
-                timer = random(20000);
-                //多分ここを.ino上で行えば良い？？
-                generatepacket();
-                Serial.println("send response!");
+                Serial.println("recv heartbeat!");
+                //slave特有の条件
+                MsTimer2::start();
                 break;
               }
             }
           }
         }
-    //digitalWrite(LED_RX,LOW);
-  init();
+    init();
+    digitalWrite(LED_RX,LOW);
   }
 }
